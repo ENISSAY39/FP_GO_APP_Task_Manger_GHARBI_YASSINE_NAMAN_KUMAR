@@ -1,0 +1,3 @@
+module github.com/ENISSAY39/FP_GO_APP_GHARBI_YASSINE_NAMAN_KUMAR
+
+go 1.25.3

@@ -18,22 +18,26 @@ func TasksCreate(c *gin.Context) {
 		DueDate     *time.Time `json:"due_date"`
 		Priority    int        `json:"priority"`
 	}
+
 	if err := c.BindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
 		return
 	}
-	projectIdStr := c.Param("projectId")
+
+	// IMPORTANT : remplacer projectId → id
+	projectIdStr := c.Param("id")
 	projectId, err := strconv.Atoi(projectIdStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project id"})
 		return
 	}
-	// check project exists
+
 	var project models.Project
 	if err := initializers.DB.First(&project, projectId).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 		return
 	}
+
 	task := models.Task{
 		Title:       body.Title,
 		Description: body.Description,
@@ -42,18 +46,23 @@ func TasksCreate(c *gin.Context) {
 		ProjectID:   uint(projectId),
 		Status:      "todo",
 	}
+
 	if err := initializers.DB.Create(&task).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Create failed"})
 		return
 	}
+
 	c.JSON(http.StatusCreated, gin.H{"task": task})
 }
 
 // TasksIndexForProject lists tasks for a project
 func TasksIndexForProject(c *gin.Context) {
-	projectId := c.Param("projectId")
+	// IMPORTANT : remplacer projectId → id
+	projectIdStr := c.Param("id")
+
 	var tasks []models.Task
-	initializers.DB.Where("project_id = ?", projectId).Find(&tasks)
+	initializers.DB.Where("project_id = ?", projectIdStr).Find(&tasks)
+
 	c.JSON(http.StatusOK, gin.H{"tasks": tasks})
 }
 

@@ -35,9 +35,10 @@ func main() {
 	router.PUT("/projects/:id", middleware.RequireAuth, controllers.ProjectsUpdate)
 	router.DELETE("/projects/:id", middleware.RequireAuth, controllers.ProjectsDelete)
 
-	// tasks
-	router.POST("/projects/:projectId/tasks", middleware.RequireAuth, controllers.TasksCreate)
-	router.GET("/projects/:projectId/tasks", controllers.TasksIndexForProject)
+	// tasks → IMPORTANT : utiliser :id pour éviter le conflit Gin
+	router.POST("/projects/:id/tasks", middleware.RequireAuth, controllers.TasksCreate)
+	router.GET("/projects/:id/tasks", controllers.TasksIndexForProject)
+
 	router.GET("/tasks/:id", controllers.TasksShow)
 	router.PUT("/tasks/:id", middleware.RequireAuth, controllers.TasksUpdate)
 	router.DELETE("/tasks/:id", middleware.RequireAuth, controllers.TasksDelete)

@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 package models
 
 import (
@@ -19,25 +18,3 @@ type Task struct {
 	Project     Project    `json:"project,omitempty"`
 	Assignees   []User     `gorm:"many2many:task_assignees" json:"assignees,omitempty"`
 }
-=======
-package models
-
-import (
-	"time"
-
-	"gorm.io/gorm"
-)
-
-// Task represents a task in a project. A task can be assigned to multiple users.
-type Task struct {
-	gorm.Model
-	Title       string     `gorm:"not null" json:"title"`
-	Description string     `json:"description"`
-	Status      string     `gorm:"default:todo" json:"status"` // todo, doing, done...
-	Priority    int        `json:"priority"`
-	DueDate     *time.Time `json:"due_date,omitempty"`
-	ProjectID   uint       `json:"project_id"`
-	Project     Project    `json:"project,omitempty"`
-	Assignees   []User     `gorm:"many2many:task_assignees" json:"assignees,omitempty"`
-}
->>>>>>> 59b3e1a700bc3a3e68597e88c6d5bf8511614e7c

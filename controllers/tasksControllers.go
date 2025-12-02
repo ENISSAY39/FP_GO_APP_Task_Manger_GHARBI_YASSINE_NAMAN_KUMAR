@@ -10,21 +10,20 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// TasksCreate creates a task under a project
+// Create task under a project. Accepts assignee_ids []uint to assign multiple users.
 func TasksCreate(c *gin.Context) {
 	var body struct {
 		Title       string     `json:"title"`
 		Description string     `json:"description"`
 		DueDate     *time.Time `json:"due_date"`
 		Priority    int        `json:"priority"`
+		AssigneeIDs []uint     `json:"assignee_ids"`
 	}
-
 	if err := c.BindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
 		return
 	}
 
-	// IMPORTANT : remplacer projectId → id
 	projectIdStr := c.Param("id")
 	projectId, err := strconv.Atoi(projectIdStr)
 	if err != nil {
@@ -52,25 +51,32 @@ func TasksCreate(c *gin.Context) {
 		return
 	}
 
+	// assign multiple users if provided
+	if len(body.AssigneeIDs) > 0 {
+		var users []models.User
+		initializers.DB.Where("id IN ?", body.AssigneeIDs).Find(&users)
+		if len(users) > 0 {
+			initializers.DB.Model(&task).Association("Assignees").Replace(&users)
+			initializers.DB.Preload("Assignees").First(&task, task.ID)
+		}
+	}
+
 	c.JSON(http.StatusCreated, gin.H{"task": task})
 }
 
 // TasksIndexForProject lists tasks for a project
 func TasksIndexForProject(c *gin.Context) {
-	// IMPORTANT : remplacer projectId → id
 	projectIdStr := c.Param("id")
-
 	var tasks []models.Task
-	initializers.DB.Where("project_id = ?", projectIdStr).Find(&tasks)
-
+	initializers.DB.Preload("Assignees").Where("project_id = ?", projectIdStr).Find(&tasks)
 	c.JSON(http.StatusOK, gin.H{"tasks": tasks})
 }
 
-// TasksShow returns a task by id (preload assignee)
+// TasksShow returns a task by id (preload assignees)
 func TasksShow(c *gin.Context) {
 	id := c.Param("id")
 	var task models.Task
-	if err := initializers.DB.Preload("Assignee").First(&task, id).Error; err != nil {
+	if err := initializers.DB.Preload("Assignees").First(&task, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 		return
 	}
@@ -86,13 +92,14 @@ func TasksUpdate(c *gin.Context) {
 		Status      string     `json:"status"`
 		DueDate     *time.Time `json:"due_date"`
 		Priority    int        `json:"priority"`
+		AssigneeIDs []uint     `json:"assignee_ids"`
 	}
 	if err := c.BindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
 		return
 	}
 	var task models.Task
-	if err := initializers.DB.First(&task, id).Error; err != nil {
+	if err := initializers.DB.Preload("Assignees").First(&task, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 		return
 	}
@@ -110,7 +117,20 @@ func TasksUpdate(c *gin.Context) {
 		task.DueDate = body.DueDate
 	}
 	task.Priority = body.Priority
-	initializers.DB.Save(&task)
+
+	if err := initializers.DB.Save(&task).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "update failed"})
+		return
+	}
+
+	// update assignees if provided
+	if body.AssigneeIDs != nil {
+		var users []models.User
+		initializers.DB.Where("id IN ?", body.AssigneeIDs).Find(&users)
+		initializers.DB.Model(&task).Association("Assignees").Replace(&users)
+		initializers.DB.Preload("Assignees").First(&task, task.ID)
+	}
+
 	c.JSON(http.StatusOK, gin.H{"task": task})
 }
 
@@ -124,28 +144,24 @@ func TasksDelete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// TasksAssign assigns a task to a user
+// TasksAssign assigns multiple users to a task
 func TasksAssign(c *gin.Context) {
 	id := c.Param("id")
 	var body struct {
-		AssigneeID uint `json:"assignee_id"`
+		AssigneeIDs []uint `json:"assignee_ids"`
 	}
 	if err := c.BindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
 		return
 	}
 	var task models.Task
-	if err := initializers.DB.First(&task, id).Error; err != nil {
+	if err := initializers.DB.Preload("Assignees").First(&task, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 		return
 	}
-	// verify assignee exists
-	var user models.User
-	if err := initializers.DB.First(&user, body.AssigneeID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Assignee not found"})
-		return
-	}
-	task.AssigneeID = &body.AssigneeID
-	initializers.DB.Save(&task)
+	var users []models.User
+	initializers.DB.Where("id IN ?", body.AssigneeIDs).Find(&users)
+	initializers.DB.Model(&task).Association("Assignees").Replace(&users)
+	initializers.DB.Preload("Assignees").First(&task, task.ID)
 	c.JSON(http.StatusOK, gin.H{"task": task})
 }

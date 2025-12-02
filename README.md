@@ -18,7 +18,7 @@ Features: Auth (JWT cookie), Projects CRUD, Tasks CRUD with assignment and statu
 ## How to run (dev)
 1. Copy `.env.example` to `.env` and set DB_DSN, SECRET_KEY, PORT
 2. `go run main.go` (or `go run .`)
-3. The API runs on `:8080`
+3. The API runs on `The API runs on http://localhost:3000`
 
 ## API Endpoints
 - POST /signup
@@ -37,9 +37,22 @@ Features: Auth (JWT cookie), Projects CRUD, Tasks CRUD with assignment and statu
 - PUT /tasks/:id/status
 
 ## Division of work
-- Person A: Models, DB, Projects endpoints, migrations
-- Person B: Auth, middleware, Tasks endpoints, README & tests
+- Yassine : Project Model&Controller ,Projects Model&Controlle0r Task DB, endpoints, migrations
+- Naman : Users Model&Controller , Auth, middleware, Tasks endpoints, README & tests
 
 ## Deliverables
-- Public GitHub repo whith youtube demo 
+- Public GitHub repo whith youtube demo <>
+
+
+
+Dans une tache tous les utilisateur ont le meme role 
+la tache se definis quand je crée la tache 
+
+
+    Dans le login une étape de vérif pour savoir si on redirige vers interface : 
+    - utilisateur (savoir les projet et les taches dans les quels il est affécté )
+    - Chef de projet (une liste des chef de projet sera donc faite dans le back end dans le require Auth ou je sais pas comment faire ducoup )
+
+
+
 

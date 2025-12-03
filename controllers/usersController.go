@@ -36,7 +36,6 @@ func Signup(c *gin.Context) {
 		return
 	}
 
-	// Do not return password in response
 	c.JSON(http.StatusCreated, gin.H{
 		"user": gin.H{
 			"id":    user.ID,
@@ -45,7 +44,7 @@ func Signup(c *gin.Context) {
 	})
 }
 
-// Login authenticates user and sets JWT cookie
+// Login authenticates user and sets JWT cookie and returns if user is a global chef (admin)
 func Login(c *gin.Context) {
 	var body struct {
 		Email    string `json:"email"`
@@ -65,6 +64,7 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	// create token
 	secret := os.Getenv("SECRET_KEY")
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub": user.ID,
@@ -76,13 +76,21 @@ func Login(c *gin.Context) {
 		return
 	}
 	// Set cookie HttpOnly
-	c.SetSameSite(0) // default Lax (0 is fine); keep explicit for clarity
+	c.SetSameSite(0)
 	c.SetCookie("Authorization", tokenString, 3600*24*30, "/", "", false, true)
 
-	c.JSON(http.StatusOK, gin.H{"message": "logged in"})
+	// check if the user is admin of at least one project (chef)
+	var count int64
+	initializers.DB.Model(&models.ProjectMember{}).
+		Where("user_id = ? AND role = ?", user.ID, "admin").
+		Count(&count)
+
+	isChef := count > 0
+
+	c.JSON(http.StatusOK, gin.H{"message": "logged in", "is_chef": isChef})
 }
 
-// Validate returns the authenticated user (expects middleware to set user)
+// Validate returns the authenticated user and extra info (projects/tasks where he participates)
 func Validate(c *gin.Context) {
 	userAny, exists := c.Get("user")
 	if !exists {
@@ -90,10 +98,37 @@ func Validate(c *gin.Context) {
 		return
 	}
 	user := userAny.(models.User)
+
+	// load memberships and projects
+	var memberships []models.ProjectMember
+	initializers.DB.Preload("Project").Where("user_id = ?", user.ID).Find(&memberships)
+
+	// fetch projects where user is member
+	projects := make([]models.Project, 0)
+	for _, m := range memberships {
+		var p models.Project
+		initializers.DB.Preload("Tasks").Preload("Members").Preload("Owner").First(&p, m.ProjectID)
+		projects = append(projects, p)
+	}
+
+	// tasks assigned to user
+	var tasks []models.Task
+	initializers.DB.Preload("Project").Model(&user).Association("Tasks").Find(&tasks)
+
+	// is chef?
+	var adminCount int64
+	initializers.DB.Model(&models.ProjectMember{}).
+		Where("user_id = ? AND role = ?", user.ID, "admin").
+		Count(&adminCount)
+	isChef := adminCount > 0
+
 	c.JSON(http.StatusOK, gin.H{
 		"user": gin.H{
-			"id":    user.ID,
-			"email": user.Email,
+			"id":     user.ID,
+			"email":  user.Email,
+			"is_chef": isChef,
 		},
+		"projects": projects,
+		"tasks":    tasks,
 	})
 }

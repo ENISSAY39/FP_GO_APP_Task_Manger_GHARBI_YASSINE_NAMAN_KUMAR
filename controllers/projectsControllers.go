@@ -10,10 +10,21 @@ import (
 )
 
 // ProjectsCreate creates a project owned by the authenticated user
+// Accepts JSON body:
+// {
+//   "name":"My project",
+//   "description":"...",
+//   "members": [{"user_id":2,"role":"member"}, {"user_id":3,"role":"admin"}]
+// }
+// Note: Owner becomes a member with role "admin" implicitly.
 func ProjectsCreate(c *gin.Context) {
 	var body struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
+		Members     []struct {
+			UserID uint   `json:"user_id"`
+			Role   string `json:"role"`
+		} `json:"members"`
 	}
 	if err := c.BindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
@@ -30,11 +41,7 @@ func ProjectsCreate(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
 		return
 	}
-	currentUser, ok := uAny.(models.User)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user in context"})
-		return
-	}
+	currentUser := uAny.(models.User)
 
 	project := models.Project{
 		Name:        body.Name,
@@ -47,9 +54,33 @@ func ProjectsCreate(c *gin.Context) {
 		return
 	}
 
-	// Re-query to preload Owner and Tasks
-	if err := initializers.DB.Preload("Owner").Preload("Tasks").First(&project, project.ID).Error; err != nil {
-		// fallback: still return created project without relations
+	// ensure owner is admin member
+	ownerMember := models.ProjectMember{
+		ProjectID: project.ID,
+		UserID:    currentUser.ID,
+		Role:      "admin",
+	}
+	initializers.DB.Create(&ownerMember)
+
+	// add other members if provided
+	for _, m := range body.Members {
+		// skip if user is owner
+		if m.UserID == currentUser.ID {
+			continue
+		}
+		if m.Role == "" {
+			m.Role = "member"
+		}
+		pm := models.ProjectMember{
+			ProjectID: project.ID,
+			UserID:    m.UserID,
+			Role:      m.Role,
+		}
+		initializers.DB.Create(&pm)
+	}
+
+	// reload with relations
+	if err := initializers.DB.Preload("Owner").Preload("Members.User").Preload("Tasks").First(&project, project.ID).Error; err != nil {
 		c.JSON(http.StatusCreated, gin.H{"project": project})
 		return
 	}
@@ -57,28 +88,28 @@ func ProjectsCreate(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"project": project})
 }
 
-// ProjectsIndex returns all projects (preloads owner and tasks)
+// ProjectsIndex returns all projects (preloads owner and tasks and members)
 func ProjectsIndex(c *gin.Context) {
 	var projects []models.Project
-	if err := initializers.DB.Preload("Owner").Preload("Tasks").Find(&projects).Error; err != nil {
+	if err := initializers.DB.Preload("Owner").Preload("Tasks").Preload("Members.User").Find(&projects).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to query projects"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"projects": projects})
 }
 
-// ProjectsShow returns a single project by id (with owner and tasks)
+// ProjectsShow returns a single project by id (with owner and tasks and members)
 func ProjectsShow(c *gin.Context) {
 	id := c.Param("id")
 	var project models.Project
-	if err := initializers.DB.Preload("Owner").Preload("Tasks").First(&project, id).Error; err != nil {
+	if err := initializers.DB.Preload("Owner").Preload("Tasks.Assignees").Preload("Members.User").First(&project, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "project not found"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"project": project})
 }
 
-// ProjectsUpdate updates a project (owner only)
+// ProjectsUpdate and Delete similar to earlier pattern (owner only)
 func ProjectsUpdate(c *gin.Context) {
 	id := c.Param("id")
 	var body struct {
@@ -99,11 +130,7 @@ func ProjectsUpdate(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
 		return
 	}
-	currentUser, ok := uAny.(models.User)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user in context"})
-		return
-	}
+	currentUser := uAny.(models.User)
 	if project.OwnerID != currentUser.ID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
@@ -117,16 +144,13 @@ func ProjectsUpdate(c *gin.Context) {
 		return
 	}
 
-	// preload relations for response
-	if err := initializers.DB.Preload("Owner").Preload("Tasks").First(&project, project.ID).Error; err == nil {
+	if err := initializers.DB.Preload("Owner").Preload("Tasks").Preload("Members.User").First(&project, project.ID).Error; err == nil {
 		c.JSON(http.StatusOK, gin.H{"project": project})
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{"project": project})
 }
 
-// ProjectsDelete deletes a project (owner only)
 func ProjectsDelete(c *gin.Context) {
 	id := c.Param("id")
 	var project models.Project
@@ -139,11 +163,7 @@ func ProjectsDelete(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
 		return
 	}
-	currentUser, ok := uAny.(models.User)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user in context"})
-		return
-	}
+	currentUser := uAny.(models.User)
 	if project.OwnerID != currentUser.ID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return

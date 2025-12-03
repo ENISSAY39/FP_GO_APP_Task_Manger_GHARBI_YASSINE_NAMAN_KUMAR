@@ -45,4 +45,10 @@ func main() {
 	router.PUT("/tasks/:id/assign", middleware.RequireAuth, controllers.TasksAssign)
 
 	router.Run(":" + port)
+	router.Static("/frontend", "./frontend")
+
+router.GET("/", func(c *gin.Context) {
+    c.File("./frontend/index.html")
+})
+
 }

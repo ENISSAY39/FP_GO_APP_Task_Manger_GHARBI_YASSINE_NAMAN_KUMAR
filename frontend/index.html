@@ -1,22 +1,97 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-    <title>Login - Task Manager</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>TaskManager — Auth</title>
+  <link rel="stylesheet" href="/frontend//css/styles.css" />
 </head>
 <body>
+  <div class="page-center">
+    <div class="card auth-card">
+      <h1>TaskManager — Auth</h1>
+      <div class="tabs">
+        <button id="tab-login" class="tab active">Login</button>
+        <button id="tab-signup" class="tab">Signup</button>
+      </div>
 
-<div class="container">
-    <h2>Login</h2>
+      <div id="form-area">
+        <div class="field"><input id="email" placeholder="email@example.com" /></div>
+        <div class="field"><input id="password" type="password" placeholder="password" /></div>
+        <div class="field"><button id="action-btn" class="btn primary">Login</button></div>
+        <div id="message" class="msg"></div>
+      </div>
+    </div>
+  </div>
 
-    <input id="email" placeholder="Email">
-    <input id="password" placeholder="Password" type="password">
+  <script src="/frontend/js/api.js"></script>
+  <script>
+    // index.js small logic
+    const tabLogin = document.getElementById('tab-login');
+    const tabSignup = document.getElementById('tab-signup');
+    const actionBtn = document.getElementById('action-btn');
+    const message = document.getElementById('message');
+    const emailEl = document.getElementById('email');
+    const passEl = document.getElementById('password');
 
-    <button onclick="login()">Login</button>
+    let mode = 'login';
 
-    <p>Don't have an account? <a href="signup.html">Signup</a></p>
-</div>
+    function setMode(m) {
+      mode = m;
+      tabLogin.classList.toggle('active', m === 'login');
+      tabSignup.classList.toggle('active', m === 'signup');
+      actionBtn.textContent = m === 'login' ? 'Login' : 'Signup';
+      message.textContent = '';
+    }
 
-<script src="app.js"></script>
+    tabLogin.onclick = () => setMode('login');
+    tabSignup.onclick = () => setMode('signup');
+
+    async function goAuth() {
+      message.textContent = '';
+      const email = emailEl.value.trim();
+      const password = passEl.value;
+      if (!email || !password) {
+        message.textContent = 'Email & password required';
+        return;
+      }
+      try {
+        if (mode === 'signup') {
+          const res = await api.post('/signup', { email, password });
+          if (!res.ok) throw await res.json();
+          message.textContent = 'Signup success — now login';
+          setMode('login');
+          return;
+        } else {
+          const res = await api.post('/login', { email, password });
+          if (!res.ok) {
+            const json = await res.json().catch(()=>({error:'Network'}));
+            message.textContent = json.error || 'Login failed';
+            return;
+          }
+          // logged in; backend sets cookie. Validate to know role and redirect.
+          const validate = await api.get('/validate');
+          if (!validate.ok) {
+            message.textContent = 'Validation failed';
+            return;
+          }
+          window.location.href = '/frontend/dashboard.html';
+        }
+      } catch (err) {
+        console.error(err);
+        message.textContent = err.error || 'Network error';
+      }
+    }
+
+    actionBtn.onclick = goAuth;
+
+    // If already logged in, go to dashboard
+    (async () => {
+      try {
+        const v = await api.get('/validate');
+        if (v.ok) window.location.href = '/frontend/dashboard.html';
+      } catch(e){}
+    })();
+  </script>
 </body>
 </html>

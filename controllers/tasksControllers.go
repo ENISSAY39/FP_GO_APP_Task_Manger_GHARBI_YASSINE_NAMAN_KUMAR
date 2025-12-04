@@ -1,335 +1,384 @@
 package controllers
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+
 	"github.com/ENISSAY39/FP_GO_APP_Task_Manger_GHARBI_YASSINE_NAMAN_KUMAR/initializers"
 	"github.com/ENISSAY39/FP_GO_APP_Task_Manger_GHARBI_YASSINE_NAMAN_KUMAR/models"
-	"github.com/gin-gonic/gin"
 )
 
-// ------------------------- CREATE TASK -------------------------
-func TasksCreate(c *gin.Context) {
-	var body struct {
-		Title       string     `json:"title"`
-		Description string     `json:"description"`
-		DueDate     *time.Time `json:"due_date"`
-		Priority    int        `json:"priority"`
-		AssigneeIDs []uint     `json:"assignee_ids"`
-	}
-	if err := c.BindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
-		return
-	}
+type createTaskPayload struct {
+	Title       string     `json:"title" binding:"required"`
+	Description string     `json:"description"`
+	DueDate     *time.Time `json:"due_date"`
+	Priority    string     `json:"priority"`
+}
 
-	projectIdStr := c.Param("id")
-	projectId, err := strconv.Atoi(projectIdStr)
+// CreateTask: any project member can create a task
+func CreateTask(c *gin.Context) {
+	pidStr := c.Param("projectId")
+	pid64, err := strconv.ParseUint(pidStr, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project id"})
 		return
 	}
+	projectID := uint(pid64)
 
-	var project models.Project
-	if err := initializers.DB.First(&project, projectId).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "project not found"})
+	userID, ok := getUserIDFromCtx(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "no user in context"})
 		return
 	}
 
-	uAny, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
+	// must be member
+	isMember, err := IsProjectMember(projectID, userID)
+	if err != nil {
+		// DB error vs not a member
+		if errors.Is(err, gorm.ErrRecordNotFound) || !isMember {
+			c.JSON(http.StatusForbidden, gin.H{"error": "not a project member"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 		return
 	}
-	user := uAny.(models.User)
+	if !isMember {
+		c.JSON(http.StatusForbidden, gin.H{"error": "not a project member"})
+		return
+	}
 
-	if !isAdminOrOwner(user, project.ID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+	var body createTaskPayload
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	task := models.Task{
 		Title:       body.Title,
 		Description: body.Description,
-		DueDate:     body.DueDate,
+		ProjectID:   projectID,
+		CreatorID:   userID,
 		Priority:    body.Priority,
-		ProjectID:   project.ID,
-		Status:      "todo",
+		DueDate:     body.DueDate,
 	}
-	if err := initializers.DB.Create(&task).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create task"})
+	if task.Priority == "" {
+		task.Priority = models.TaskPriorityMedium
+	}
+	db := initializers.DB
+	if err := db.Create(&task).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create task"})
 		return
 	}
 
-	// assign
-	if len(body.AssigneeIDs) > 0 {
-		var users []models.User
-		if err := initializers.DB.Where("id IN ?", body.AssigneeIDs).Find(&users).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch assignees"})
-			return
-		}
-		if err := initializers.DB.Model(&task).Association("Assignees").Replace(&users); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to assign users"})
-			return
-		}
-		if err := initializers.DB.Preload("Assignees").First(&task, task.ID).Error; err != nil {
-			// rare, but handle
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load created task"})
-			return
-		}
-	}
-
+	// return the created task (with ID, timestamps)
 	c.JSON(http.StatusCreated, gin.H{"task": task})
 }
 
-// ------------------------- LIST TASKS FOR PROJECT -------------------------
-func TasksIndexForProject(c *gin.Context) {
-	projectIdStr := c.Param("id")
-	projectId, err := strconv.Atoi(projectIdStr)
+// GetProjectTasks returns tasks in project for members
+func GetProjectTasks(c *gin.Context) {
+	pidStr := c.Param("projectId")
+	pid64, err := strconv.ParseUint(pidStr, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project id"})
 		return
 	}
+	projectID := uint(pid64)
+
+	userID, ok := getUserIDFromCtx(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "no user in context"})
+		return
+	}
+
+	isMember, err := IsProjectMember(projectID, userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) || !isMember {
+			c.JSON(http.StatusForbidden, gin.H{"error": "not a project member"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+		return
+	}
+	if !isMember {
+		c.JSON(http.StatusForbidden, gin.H{"error": "not a project member"})
+		return
+	}
 
 	var tasks []models.Task
-	if err := initializers.DB.Preload("Assignees").Where("project_id = ?", projectId).Find(&tasks).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch tasks"})
+	if err := initializers.DB.Where("project_id = ?", projectID).Preload("Assignees").Find(&tasks).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not load tasks"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"tasks": tasks})
 }
 
-// ------------------------- SHOW TASK -------------------------
-func TasksShow(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.Atoi(idStr)
+// UpdateTask: creator or project owner can update
+type updateTaskPayload struct {
+	Title       *string    `json:"title"`
+	Description *string    `json:"description"`
+	Status      *string    `json:"status"`
+	Priority    *string    `json:"priority"`
+	DueDate     *time.Time `json:"due_date"`
+}
+
+func UpdateTask(c *gin.Context) {
+	tidStr := c.Param("taskId")
+	tid64, err := strconv.ParseUint(tidStr, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid task id"})
 		return
 	}
+	taskID := uint(tid64)
+
+	userID, ok := getUserIDFromCtx(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "no user in context"})
+		return
+	}
 
 	var task models.Task
-	if err := initializers.DB.Preload("Assignees").Preload("Project").
-		First(&task, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+	if err := initializers.DB.First(&task, taskID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 		return
 	}
 
-	uAny, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
-		return
-	}
-	user := uAny.(models.User)
-
-	// admin always allowed
-	if user.IsAdmin {
-		c.JSON(http.StatusOK, gin.H{"task": task})
-		return
-	}
-
-	// owner allowed
-	if task.Project.OwnerID == user.ID {
-		c.JSON(http.StatusOK, gin.H{"task": task})
-		return
+	// check permission: creator or project owner
+	if task.CreatorID != userID {
+		isOwner, err := IsProjectOwner(task.ProjectID, userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+			return
+		}
+		if !isOwner {
+			c.JSON(http.StatusForbidden, gin.H{"error": "only creator or owner can update task"})
+			return
+		}
 	}
 
-	// assignee allowed
-	var count int64
-	if err := initializers.DB.Table("task_assignees").
-		Where("task_id = ? AND user_id = ?", task.ID, user.ID).
-		Count(&count).Error; err == nil && count > 0 {
-		c.JSON(http.StatusOK, gin.H{"task": task})
+	var body updateTaskPayload
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// member of project allowed
-	if err := initializers.DB.Model(&models.ProjectMember{}).
-		Where("project_id = ? AND user_id = ?", task.ProjectID, user.ID).
-		Count(&count).Error; err != nil || count == 0 {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+	updated := map[string]interface{}{}
+	if body.Title != nil {
+		updated["title"] = *body.Title
+	}
+	if body.Description != nil {
+		updated["description"] = *body.Description
+	}
+	if body.Status != nil {
+		updated["status"] = *body.Status
+	}
+	if body.Priority != nil {
+		updated["priority"] = *body.Priority
+	}
+	if body.DueDate != nil {
+		updated["due_date"] = body.DueDate
+	}
+
+	if len(updated) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "no fields to update"})
+		return
+	}
+
+	if err := initializers.DB.Model(&task).Updates(updated).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not update task"})
+		return
+	}
+
+	// reload task to return current values
+	if err := initializers.DB.Preload("Assignees").First(&task, taskID).Error; err != nil {
+		// even if reload fails, return success (task updated), but inform
+		c.JSON(http.StatusOK, gin.H{"task": task, "warning": "updated but failed to reload"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"task": task})
 }
 
-// ------------------------- UPDATE TASK -------------------------
-func TasksUpdate(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid task id"})
-		return
-	}
-
-	var body struct {
-		Title       string     `json:"title"`
-		Description string     `json:"description"`
-		Status      string     `json:"status"`
-		DueDate     *time.Time `json:"due_date"`
-		Priority    int        `json:"priority"`
-		AssigneeIDs []uint     `json:"assignee_ids"`
-	}
-	if err := c.BindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
-		return
-	}
-
-	var task models.Task
-	if err := initializers.DB.Preload("Assignees").First(&task, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
-		return
-	}
-
-	uAny, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
-		return
-	}
-	user := uAny.(models.User)
-
-	if !isAdminOrOwner(user, task.ProjectID) {
-		// Only assignee can update status
-		if body.Status == "" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
-			return
-		}
-		var count int64
-		if err := initializers.DB.Table("task_assignees").
-			Where("task_id = ? AND user_id = ?", task.ID, user.ID).
-			Count(&count).Error; err != nil || count == 0 {
-			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
-			return
-		}
-		task.Status = body.Status
-	} else {
-		// Admin/Owner can edit everything
-		if body.Title != "" {
-			task.Title = body.Title
-		}
-		if body.Description != "" {
-			task.Description = body.Description
-		}
-		if body.Status != "" {
-			task.Status = body.Status
-		}
-		if body.DueDate != nil {
-			task.DueDate = body.DueDate
-		}
-		// priority may be zero intentionally; we still set it
-		task.Priority = body.Priority
-	}
-
-	// Save
-	if err := initializers.DB.Save(&task).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update task"})
-		return
-	}
-
-	// Update assignees if admin/owner
-	if body.AssigneeIDs != nil && isAdminOrOwner(user, task.ProjectID) {
-		var users []models.User
-		if err := initializers.DB.Where("id IN ?", body.AssigneeIDs).Find(&users).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch assignees"})
-			return
-		}
-		if err := initializers.DB.Model(&task).Association("Assignees").Replace(&users); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update assignees"})
-			return
-		}
-		if err := initializers.DB.Preload("Assignees").First(&task, task.ID).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load task"})
-			return
-		}
-	}
-
-	c.JSON(http.StatusOK, gin.H{"task": task})
+// Assign/Unassign
+type assignPayload struct {
+	UserID uint `json:"user_id" binding:"required"`
 }
 
-// ------------------------- DELETE TASK -------------------------
-func TasksDelete(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.Atoi(idStr)
+func AssignTask(c *gin.Context) {
+	tidStr := c.Param("taskId")
+	tid64, err := strconv.ParseUint(tidStr, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid task id"})
 		return
 	}
+	taskID := uint(tid64)
 
+	userID, ok := getUserIDFromCtx(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "no user in context"})
+		return
+	}
+
+	// load task
 	var task models.Task
-	if err := initializers.DB.First(&task, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+	if err := initializers.DB.First(&task, taskID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 		return
 	}
 
-	uAny, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
+	// only project members can assign (and assign target must be a member)
+	isMember, err := IsProjectMember(task.ProjectID, userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) || !isMember {
+			c.JSON(http.StatusForbidden, gin.H{"error": "not a project member"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 		return
 	}
-	user := uAny.(models.User)
+	if !isMember {
+		c.JSON(http.StatusForbidden, gin.H{"error": "not a project member"})
+		return
+	}
 
-	if !isAdminOrOwner(user, task.ProjectID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+	var body assignPayload
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := initializers.DB.Delete(&task).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete task"})
+	// check target is member
+	targetIsMember, err := IsProjectMember(task.ProjectID, body.UserID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) || !targetIsMember {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "target user not a project member"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 		return
 	}
-	c.Status(http.StatusNoContent)
+	if !targetIsMember {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "target user not a project member"})
+		return
+	}
+
+	ass := models.TaskAssignee{
+		TaskID: taskID,
+		UserID: body.UserID,
+	}
+	if err := initializers.DB.Where("task_id = ? AND user_id = ?", taskID, body.UserID).FirstOrCreate(&ass).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not assign"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "assigned"})
 }
 
-// ------------------------- ASSIGN TASK -------------------------
-func TasksAssign(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.Atoi(idStr)
+func UnassignTask(c *gin.Context) {
+	tidStr := c.Param("taskId")
+	tid64, err := strconv.ParseUint(tidStr, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid task id"})
 		return
 	}
+	taskID := uint(tid64)
 
-	var body struct {
-		AssigneeIDs []uint `json:"assignee_ids"`
-	}
-	if err := c.BindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+	userID, ok := getUserIDFromCtx(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "no user in context"})
 		return
 	}
 
 	var task models.Task
-	if err := initializers.DB.First(&task, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+	if err := initializers.DB.First(&task, taskID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 		return
 	}
 
-	uAny, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
+	// only project members can unassign
+	isMember, err := IsProjectMember(task.ProjectID, userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) || !isMember {
+			c.JSON(http.StatusForbidden, gin.H{"error": "not a project member"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 		return
 	}
-	user := uAny.(models.User)
-
-	if !isAdminOrOwner(user, task.ProjectID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
-		return
-	}
-
-	var users []models.User
-	if err := initializers.DB.Where("id IN ?", body.AssigneeIDs).Find(&users).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch assignees"})
-		return
-	}
-	if err := initializers.DB.Model(&task).Association("Assignees").Replace(&users); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to assign users"})
-		return
-	}
-	if err := initializers.DB.Preload("Assignees").First(&task, task.ID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load task"})
+	if !isMember {
+		c.JSON(http.StatusForbidden, gin.H{"error": "not a project member"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"task": task})
+	var body assignPayload
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := initializers.DB.Where("task_id = ? AND user_id = ?", taskID, body.UserID).Delete(&models.TaskAssignee{}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not unassign"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "unassigned"})
+}
+
+// DeleteTask: creator or project owner can delete
+func DeleteTask(c *gin.Context) {
+	tidStr := c.Param("taskId")
+	tid64, err := strconv.ParseUint(tidStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid task id"})
+		return
+	}
+	taskID := uint(tid64)
+
+	userID, ok := getUserIDFromCtx(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "no user in context"})
+		return
+	}
+
+	var task models.Task
+	if err := initializers.DB.First(&task, taskID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+		return
+	}
+
+	if task.CreatorID != userID {
+		isOwner, err := IsProjectOwner(task.ProjectID, userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+			return
+		}
+		if !isOwner {
+			c.JSON(http.StatusForbidden, gin.H{"error": "only creator or owner can delete task"})
+			return
+		}
+	}
+
+	if err := initializers.DB.Delete(&models.Task{}, taskID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not delete task"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "task deleted"})
 }

@@ -1,22 +1,29 @@
 package models
 
 import (
-	"time"
+    "time"
 
-	"gorm.io/gorm"
+    "gorm.io/gorm"
+)
+
+const (
+    RoleOwner  = "OWNER"
+    RoleMember = "MEMBER"
 )
 
 type Project struct {
-	ID          uint           `gorm:"primaryKey" json:"id"`
-	Name        string         `gorm:"size:150;not null" json:"name"`
-	Description string         `gorm:"type:text" json:"description,omitempty"`
-	OwnerID     uint           `gorm:"not null;index" json:"owner_id"` // référence vers user (owner principal)
-	Owner       User           `gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"-"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
-	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+    ID          uint           `gorm:"primaryKey" json:"id"`
+    Name        string         `gorm:"size:150;not null" json:"name"`
+    Description string         `gorm:"type:text" json:"description,omitempty"`
 
-	// Relations
-	Members []ProjectMember `gorm:"foreignKey:ProjectID" json:"members,omitempty"`
-	Tasks   []Task          `gorm:"foreignKey:ProjectID" json:"tasks,omitempty"`
+    // IMPORTANT: nullable, sinon MySQL casse ON DELETE SET NULL
+    OwnerID     *uint          `gorm:"index" json:"owner_id"`
+    Owner       User           `gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"owner"`
+
+    Members     []ProjectMember `gorm:"foreignKey:ProjectID" json:"members"`
+    Tasks       []Task          `gorm:"foreignKey:ProjectID" json:"tasks"`
+
+    CreatedAt   time.Time      `json:"created_at"`
+    UpdatedAt   time.Time      `json:"updated_at"`
+    DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 }

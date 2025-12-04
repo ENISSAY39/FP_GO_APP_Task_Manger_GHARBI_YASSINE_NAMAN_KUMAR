@@ -1,280 +1,322 @@
 package controllers
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
-	"strings"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 
 	"github.com/ENISSAY39/FP_GO_APP_Task_Manger_GHARBI_YASSINE_NAMAN_KUMAR/initializers"
 	"github.com/ENISSAY39/FP_GO_APP_Task_Manger_GHARBI_YASSINE_NAMAN_KUMAR/models"
-	"github.com/gin-gonic/gin"
 )
 
-// ------------------------- CREATE PROJECT -------------------------
-func ProjectsCreate(c *gin.Context) {
-	var body struct {
-		Name        string `json:"name"`
-		Description string `json:"description"`
-		OwnerID     uint   `json:"owner_id"` // only admin can set
-		Members     []struct {
-			UserID uint `json:"user_id"`
-		} `json:"members"`
+type createProjectPayload struct {
+	Name        string `json:"name" binding:"required"`
+	Description string `json:"description"`
+}
+
+// CreateProject: authenticated user becomes Owner and member(RoleOwner)
+func CreateProject(c *gin.Context) {
+	var body createProjectPayload
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
-	if err := c.BindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+	userID, ok := getUserIDFromCtx(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "no user in context"})
 		return
 	}
 
-	body.Name = strings.TrimSpace(body.Name)
-	if body.Name == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "name required"})
-		return
-	}
-
-	uAny, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
-		return
-	}
-	user := uAny.(models.User)
-
-	ownerID := user.ID
-	if user.IsAdmin && body.OwnerID != 0 {
-		ownerID = body.OwnerID
-	}
-
+	db := initializers.DB
 	project := models.Project{
 		Name:        body.Name,
-		Description: strings.TrimSpace(body.Description),
-		OwnerID:     ownerID,
+		Description: body.Description,
+		OwnerID:     &userID,
 	}
-
-	if err := initializers.DB.Create(&project).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create project"})
+	if err := db.Create(&project).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create project"})
 		return
 	}
 
-	// Add members including owner
-	if err := initializers.DB.Where("project_id = ? AND user_id = ?", project.ID, ownerID).
-		FirstOrCreate(&models.ProjectMember{ProjectID: project.ID, UserID: ownerID, Role: "member"}).Error; err != nil {
-		// not fatal for project creation, but inform
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to add project owner as member"})
+	// add ProjectMember as OWNER
+	if err := AddProjectMember(project.ID, userID, models.RoleOwner); err != nil {
+		// best-effort: log, but don't fail creation
+		c.JSON(http.StatusCreated, gin.H{"project": project, "warning": "created but could not add member"})
 		return
 	}
 
-	for _, m := range body.Members {
-		if m.UserID == ownerID {
-			continue
-		}
-		if err := initializers.DB.Where("project_id = ? AND user_id = ?", project.ID, m.UserID).
-			FirstOrCreate(&models.ProjectMember{ProjectID: project.ID, UserID: m.UserID, Role: "member"}).Error; err != nil {
-			// skip failing member but return error (could be adjusted)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to add project members"})
-			return
-		}
-	}
-
-	if err := initializers.DB.Preload("Owner").Preload("Members.User").Preload("Tasks").First(&project, project.ID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load project"})
-		return
-	}
 	c.JSON(http.StatusCreated, gin.H{"project": project})
 }
 
-// ------------------------- LIST PROJECTS -------------------------
-func ProjectsIndex(c *gin.Context) {
-	uAny, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
+// GetMyProjects returns projects where user is a member (preload members and tasks count)
+func GetMyProjects(c *gin.Context) {
+	userID, ok := getUserIDFromCtx(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "no user in context"})
 		return
 	}
-	user := uAny.(models.User)
+	db := initializers.DB
+
+	var memberships []models.ProjectMember
+	if err := db.Where("user_id = ?", userID).Find(&memberships).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+		return
+	}
+
+	projectIDs := make([]uint, 0, len(memberships))
+	for _, m := range memberships {
+		projectIDs = append(projectIDs, m.ProjectID)
+	}
 
 	var projects []models.Project
-	var err error
-	if user.IsAdmin {
-		err = initializers.DB.Preload("Tasks").Preload("Owner").Preload("Members.User").Find(&projects).Error
-	} else {
-		err = initializers.DB.
-			Preload("Tasks").
-			Preload("Owner").
-			Preload("Members.User").
-			Joins("LEFT JOIN project_members ON project_members.project_id = projects.id").
-			Where("projects.owner_id = ? OR project_members.user_id = ?", user.ID, user.ID).
-			Group("projects.id").
-			Find(&projects).Error
-	}
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch projects"})
-		return
+	if len(projectIDs) > 0 {
+		if err := db.Where("id IN ?", projectIDs).Preload("Members").Preload("Tasks").Find(&projects).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not load projects"})
+			return
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"projects": projects})
 }
 
-// ------------------------- SHOW PROJECT -------------------------
-func ProjectsShow(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.Atoi(idStr)
+// GetProjectDetail returns project if user is member
+func GetProjectDetail(c *gin.Context) {
+	pidStr := c.Param("projectId")
+	pid64, err := strconv.ParseUint(pidStr, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project id"})
 		return
 	}
+	projectID := uint(pid64)
+	userID, ok := getUserIDFromCtx(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "no user in context"})
+		return
+	}
 
+	// check membership using explicit error handling
+	isMember, err := IsProjectMember(projectID, userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "not a member"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+		return
+	}
+	if !isMember {
+		// defensive: treat as forbidden
+		c.JSON(http.StatusForbidden, gin.H{"error": "not a member"})
+		return
+	}
+
+	db := initializers.DB
 	var project models.Project
-	if err := initializers.DB.Preload("Owner").Preload("Tasks.Assignees").
-		Preload("Members.User").First(&project, id).Error; err != nil {
+	if err := db.Preload("Members").Preload("Tasks.Assignees").First(&project, projectID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "project not found"})
 		return
 	}
+	c.JSON(http.StatusOK, gin.H{"project": project})
+}
 
-	uAny, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
+// AddMember: only OWNER can add
+type addMemberPayload struct {
+	UserID uint   `json:"user_id" binding:"required"`
+	Role   string `json:"role"` // optional: OWNER or MEMBER
+}
+
+func AddMember(c *gin.Context) {
+	pidStr := c.Param("projectId")
+	pid64, err := strconv.ParseUint(pidStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project id"})
 		return
 	}
-	user := uAny.(models.User)
+	projectID := uint(pid64)
+	userID, ok := getUserIDFromCtx(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "no user in context"})
+		return
+	}
 
-	if !user.IsAdmin && user.ID != project.OwnerID {
-		var count int64
-		if err := initializers.DB.Model(&models.ProjectMember{}).
-			Where("project_id = ? AND user_id = ?", project.ID, user.ID).
-			Count(&count).Error; err != nil || count == 0 {
-			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+	owner, err := IsProjectOwner(projectID, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+		return
+	}
+	if !owner {
+		c.JSON(http.StatusForbidden, gin.H{"error": "only owner can add members"})
+		return
+	}
+
+	var body addMemberPayload
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	role := body.Role
+	if role != models.RoleOwner {
+		role = models.RoleMember
+	}
+
+	if err := AddProjectMember(projectID, body.UserID, role); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not add member"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "member added"})
+}
+
+// RemoveMember: only OWNER can remove (cannot remove self if last owner)
+type removeMemberPayload struct {
+	UserID uint `json:"user_id" binding:"required"`
+}
+
+func RemoveMember(c *gin.Context) {
+	pidStr := c.Param("projectId")
+	pid64, err := strconv.ParseUint(pidStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project id"})
+		return
+	}
+	projectID := uint(pid64)
+	userID, ok := getUserIDFromCtx(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "no user in context"})
+		return
+	}
+
+	owner, err := IsProjectOwner(projectID, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+		return
+	}
+	if !owner {
+		c.JSON(http.StatusForbidden, gin.H{"error": "only owner can remove members"})
+		return
+	}
+
+	var body removeMemberPayload
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// don't allow removing the owner (project.OwnerID) via this route
+	var proj models.Project
+	if err := initializers.DB.First(&proj, projectID).Error; err == nil {
+		if proj.OwnerID != nil && *proj.OwnerID == body.UserID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "cannot remove project owner"})
 			return
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{"project": project})
+	if err := RemoveProjectMember(projectID, body.UserID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not remove member"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "member removed"})
 }
 
-// ------------------------- UPDATE PROJECT -------------------------
-func ProjectsUpdate(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.Atoi(idStr)
+// DeleteProject: only owner can delete
+func DeleteProject(c *gin.Context) {
+	pidStr := c.Param("projectId")
+	pid64, err := strconv.ParseUint(pidStr, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project id"})
 		return
 	}
-
-	var body struct {
-		Name        string `json:"name"`
-		Description string `json:"description"`
-	}
-	if err := c.BindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+	projectID := uint(pid64)
+	userID, ok := getUserIDFromCtx(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "no user in context"})
 		return
 	}
 
-	var project models.Project
-	if err := initializers.DB.First(&project, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "project not found"})
+	isOwner, err := IsProjectOwner(projectID, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+		return
+	}
+	if !isOwner {
+		c.JSON(http.StatusForbidden, gin.H{"error": "only owner can delete project"})
 		return
 	}
 
-	uAny, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
+	if err := initializers.DB.Delete(&models.Project{}, projectID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not delete project"})
 		return
 	}
-	user := uAny.(models.User)
-
-	if !isAdminOrOwner(user, project.ID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
-		return
-	}
-
-	if body.Name != "" {
-		project.Name = strings.TrimSpace(body.Name)
-	}
-	if body.Description != "" {
-		project.Description = strings.TrimSpace(body.Description)
-	}
-
-	if err := initializers.DB.Save(&project).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update project"})
-		return
-	}
-	if err := initializers.DB.Preload("Owner").Preload("Tasks").Preload("Members.User").First(&project, project.ID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load project"})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"project": project})
+	c.JSON(http.StatusOK, gin.H{"message": "project deleted"})
 }
 
-// ------------------------- DELETE PROJECT -------------------------
-func ProjectsDelete(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.Atoi(idStr)
+// helper to read userID from context (expects uint)
+func getUserIDFromCtx(c *gin.Context) (uint, bool) {
+	v, ok := c.Get("userID")
+	if !ok {
+		return 0, false
+	}
+	switch id := v.(type) {
+	case uint:
+		return id, true
+	case int:
+		return uint(id), true
+	case int64:
+		return uint(id), true
+	default:
+		return 0, false
+	}
+}
+
+
+// RemoveMemberByParam handles DELETE /projects/:projectId/members/:userId
+func RemoveMemberByParam(c *gin.Context) {
+	pidStr := c.Param("projectId")
+	pid64, err := strconv.ParseUint(pidStr, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project id"})
 		return
 	}
+	projectID := uint(pid64)
 
-	var project models.Project
-	if err := initializers.DB.First(&project, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "project not found"})
+	uidStr := c.Param("userId")
+	uid64, err := strconv.ParseUint(uidStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+		return
+	}
+	targetUserID := uint(uid64)
+
+	callerID, ok := getUserIDFromCtx(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "no user in context"})
 		return
 	}
 
-	uAny, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
+	isOwner, err := IsProjectOwner(projectID, callerID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 		return
 	}
-	user := uAny.(models.User)
-
-	if !isAdminOrOwner(user, project.ID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
-		return
-	}
-
-	if err := initializers.DB.Delete(&project).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete project"})
-		return
-	}
-	c.Status(http.StatusNoContent)
-}
-
-// ------------------------- ADD MEMBERS TO PROJECT -------------------------
-func ProjectsAddMembers(c *gin.Context) {
-	idStr := c.Param("id")
-	id, _ := strconv.Atoi(idStr)
-
-	var body struct {
-		MemberIDs []uint `json:"member_ids"`
-	}
-	if err := c.BindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+	if !isOwner {
+		c.JSON(http.StatusForbidden, gin.H{"error": "only owner can remove members"})
 		return
 	}
 
-	// verify project exists
-	var project models.Project
-	if err := initializers.DB.First(&project, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "project not found"})
-		return
-	}
-
-	uAny, _ := c.Get("user")
-	user := uAny.(models.User)
-
-	// only admin or owner can add members
-	if !isAdminOrOwner(user, project.ID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
-		return
-	}
-
-	// add each member (skip duplicates)
-	for _, uid := range body.MemberIDs {
-		if uid == project.OwnerID {
-			continue
+	// don't allow removing the project owner via this route
+	var proj models.Project
+	if err := initializers.DB.First(&proj, projectID).Error; err == nil {
+		if proj.OwnerID != nil && *proj.OwnerID == targetUserID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "cannot remove project owner"})
+			return
 		}
-		initializers.DB.Where("project_id = ? AND user_id = ?", project.ID, uid).
-			FirstOrCreate(&models.ProjectMember{ProjectID: project.ID, UserID: uid, Role: "member"})
 	}
 
-	// return updated project with members
-	initializers.DB.Preload("Owner").Preload("Members.User").Preload("Tasks").First(&project, project.ID)
-	c.JSON(http.StatusOK, gin.H{"project": project})
+	if err := RemoveProjectMember(projectID, targetUserID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not remove member"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "member removed"})
 }

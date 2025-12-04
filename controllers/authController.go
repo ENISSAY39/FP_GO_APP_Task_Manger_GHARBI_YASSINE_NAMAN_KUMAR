@@ -1,156 +1,120 @@
 package controllers
 
 import (
+	"errors"
 	"net/http"
 	"os"
 	"time"
 
-	"github.com/ENISSAY39/FP_GO_APP_Task_Manger_GHARBI_YASSINE_NAMAN_KUMAR/initializers"
-	"github.com/ENISSAY39/FP_GO_APP_Task_Manger_GHARBI_YASSINE_NAMAN_KUMAR/models"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
-	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
+
+	"github.com/ENISSAY39/FP_GO_APP_Task_Manger_GHARBI_YASSINE_NAMAN_KUMAR/initializers"
+	"github.com/ENISSAY39/FP_GO_APP_Task_Manger_GHARBI_YASSINE_NAMAN_KUMAR/models"
 )
 
-// ------------------------- SIGNUP -------------------------
-func Signup(c *gin.Context) {
-	var body struct {
-		Email    string `json:"email" binding:"required,email"`
-		Password string `json:"password" binding:"required,min=6"`
-	}
+type signupPayload struct {
+	Name     string `json:"name" binding:"required,min=2"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=6"`
+}
 
-	if err := c.BindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+type loginPayload struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required"`
+}
+
+// Signup create user
+func Signup(c *gin.Context) {
+	var body signupPayload
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(body.Password), bcrypt.DefaultCost)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "hash error"})
+	db := initializers.DB
+
+	// check if email already exists
+	var existing models.User
+	err := db.Where("email = ?", body.Email).First(&existing).Error
+
+	switch {
+	case err == nil:
+		// found -> email already used
+		c.JSON(http.StatusBadRequest, gin.H{"error": "email already used"})
+		return
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		// not found -> continue
+	default:
+		// other DB error
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 		return
 	}
 
 	user := models.User{
-		Email:    body.Email,
-		Password: string(hash),
-		IsAdmin:  false,
+		Name:  body.Name,
+		Email: body.Email,
 	}
 
-	if err := initializers.DB.Create(&user).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "email already exists"})
+	// use single err variable (avoid shadowing)
+	if err = user.SetPassword(body.Password); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not hash password"})
 		return
 	}
 
+	if err = db.Create(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create user"})
+		return
+	}
+
+	// minimal response without password
 	c.JSON(http.StatusCreated, gin.H{
-		"user": gin.H{
-			"id":    user.ID,
-			"email": user.Email,
-		},
+		"user": gin.H{"id": user.ID, "name": user.Name, "email": user.Email},
 	})
 }
 
-// ------------------------- LOGIN -------------------------
+// Login returns JWT token
 func Login(c *gin.Context) {
-	var body struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
-
-	if err := c.BindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+	var body loginPayload
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	db := initializers.DB
 	var user models.User
-	if err := initializers.DB.First(&user, "email = ?", body.Email).Error; err != nil {
+	if err := db.Where("email = ?", body.Email).First(&user).Error; err != nil {
+		// do not reveal whether email exists
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(body.Password)); err != nil {
+	if !user.CheckPassword(body.Password) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}
 
-	secret := os.Getenv("SECRET_KEY")
+	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
-		secret = "dev-secret"
+		secret = "dev_secret_change_me"
 	}
 
-	exp := time.Now().Add(24 * time.Hour * 30).Unix()
 	claims := jwt.MapClaims{
 		"sub": user.ID,
-		"exp": exp,
+		"exp": time.Now().Add(24 * time.Hour).Unix(),
+		"iat": time.Now().Unix(),
+		"nbf": time.Now().Unix(),
 	}
-
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString([]byte(secret))
+	signed, err := token.SignedString([]byte(secret))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to sign token"})
-		return
-	}
-
-	// Cookie is HttpOnly and secure flag depends on env; keep SameSite lax
-	c.SetSameSite(http.SameSiteLaxMode)
-	// 3600*24*30 seconds = 30 days
-	c.SetCookie("Authorization", tokenString, 3600*24*30, "/", "", false, true)
-
-	c.JSON(http.StatusOK, gin.H{
-		"message":  "logged in",
-		"is_admin": user.IsAdmin,
-	})
-}
-
-// ------------------------- LOGOUT -------------------------
-func Logout(c *gin.Context) {
-	// delete cookie
-	c.SetCookie("Authorization", "", -1, "/", "", false, true)
-	c.JSON(http.StatusOK, gin.H{"message": "logged out"})
-}
-
-// ------------------------- VALIDATE -------------------------
-func Validate(c *gin.Context) {
-	userAny, exists := c.Get("user")
-	if !exists {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
-		return
-	}
-	user := userAny.(models.User)
-
-	var memberships []models.ProjectMember
-	if err := initializers.DB.Preload("Project").Where("user_id = ?", user.ID).Find(&memberships).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch memberships"})
-		return
-	}
-
-	var projects []models.Project
-	for _, m := range memberships {
-		var p models.Project
-		if err := initializers.DB.
-			Preload("Tasks").
-			Preload("Members.User").
-			Preload("Owner").
-			First(&p, m.ProjectID).Error; err == nil {
-			projects = append(projects, p)
-		}
-	}
-
-	var tasks []models.Task
-	// load tasks assigned to user via association
-	if err := initializers.DB.Preload("Project").Model(&user).Association("Tasks").Find(&tasks); err != nil {
-		// GORM's Association.Find returns error type, so handle it (if any)
-		// If there's an error, continue with empty tasks but notify in response
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch tasks"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create token"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"user": gin.H{
-			"id":       user.ID,
-			"email":    user.Email,
-			"is_admin": user.IsAdmin,
-		},
-		"projects": projects,
-		"tasks":    tasks,
+		"token": signed,
+		"user":  gin.H{"id": user.ID, "name": user.Name, "email": user.Email},
 	})
 }

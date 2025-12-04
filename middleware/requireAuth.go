@@ -12,42 +12,63 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-// RequireAuth middleware checks cookie Authorization, validates JWT and attaches user
-func RequireAuth(c *gin.Context) {
-	tokenString, err := c.Cookie("Authorization")
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing auth token"})
-		return
-	}
-	secret := os.Getenv("SECRET_KEY")
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
-		// verify signing method
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+func RequireAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		// --- 1) Récupérer le cookie ---
+		tokenString, err := c.Cookie("Authorization")
+		if err != nil || tokenString == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing auth token"})
+			c.Abort()
+			return
 		}
-		return []byte(secret), nil
-	})
-	if err != nil || !token.Valid {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
-		return
+
+		// --- 2) Récupérer la clé secrète ---
+		secret := os.Getenv("SECRET_KEY")
+		if secret == "" {
+			secret = "dev-secret"
+		}
+
+		// --- 3) Décoder le token JWT ---
+		token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
+			// on vérifie qu’on utilise bien HS256
+			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("invalid signing method")
+			}
+			return []byte(secret), nil
+		})
+
+		if err != nil || !token.Valid {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+			c.Abort()
+			return
+		}
+
+		// --- 4) Extraire les claims ---
+		claims := token.Claims.(jwt.MapClaims)
+
+		// Vérifier expiration
+		if float64(time.Now().Unix()) > claims["exp"].(float64) {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "token expired"})
+			c.Abort()
+			return
+		}
+
+		// Récupérer l’ID de l'utilisateur (sub)
+		userID := uint(claims["sub"].(float64))
+
+		// --- 5) Charger l'utilisateur depuis la DB ---
+		var user models.User
+		if err := initializers.DB.First(&user, userID).Error; err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
+			c.Abort()
+			return
+		}
+
+		// --- 6) Attacher le user dans le contexte ---
+		c.Set("user", user)
+
+		// --- 7) Continuer la requête ---
+		c.Next()
 	}
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token claims"})
-		return
-	}
-	// check expiry
-	if float64(time.Now().Unix()) > claims["exp"].(float64) {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "token expired"})
-		return
-	}
-	uid := uint(claims["sub"].(float64))
-	var user models.User
-	if err := initializers.DB.First(&user, uid).Error; err != nil {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
-		return
-	}
-	// attach user to context
-	c.Set("user", user)
-	c.Next()
 }

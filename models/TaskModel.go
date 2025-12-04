@@ -14,7 +14,7 @@ type Task struct {
 	Status      string     `gorm:"default:todo" json:"status"` // todo, doing, done...
 	Priority    int        `json:"priority"`
 	DueDate     *time.Time `json:"due_date,omitempty"`
-	ProjectID   uint       `json:"project_id"`
-	Project     Project    `json:"project,omitempty"`
+	ProjectID   uint       `gorm:"index" json:"project_id"`
+	Project     Project    `gorm:"foreignKey:ProjectID" json:"project,omitempty"`
 	Assignees   []User     `gorm:"many2many:task_assignees" json:"assignees,omitempty"`
 }

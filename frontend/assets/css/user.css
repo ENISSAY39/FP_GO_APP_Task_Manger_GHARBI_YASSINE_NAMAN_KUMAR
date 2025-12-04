@@ -1,0 +1,5 @@
+.user-grid{display:grid;grid-template-columns:1fr 340px;gap:16px}
+.task-card{border-left:4px solid #eee;padding:12px;border-radius:8px;margin-bottom:10px}
+.task-title{font-weight:700}
+.task-meta{font-size:.9rem;color:var(--muted)}
+.list{max-height:60vh;overflow:auto;padding-right:6px}

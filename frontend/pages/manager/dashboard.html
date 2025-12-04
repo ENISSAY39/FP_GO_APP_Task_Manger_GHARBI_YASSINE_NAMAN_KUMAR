@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Manager Dashboard — TaskManager</title>
+
+  <!-- Dynamic injection of CSS and module loading (robust to Live Server root differences) -->
+  <script>
+    (function() {
+      // Determine prefix: if path includes "/frontend/" then server root is project root so
+      // resources must be prefixed with '/frontend'. Otherwise no prefix.
+      var hasFrontendSegment = window.location.pathname.includes('/frontend/');
+      var ROOT_PREFIX = hasFrontendSegment ? '/frontend' : '';
+      window.__APP_ROOT_PREFIX = ROOT_PREFIX;
+
+      // Insert CSS links
+      var head = document.getElementsByTagName('head')[0];
+
+      var cssBase = document.createElement('link');
+      cssBase.rel = 'stylesheet';
+      cssBase.href = ROOT_PREFIX + '/assets/css/base.css';
+      head.appendChild(cssBase);
+
+      var cssManager = document.createElement('link');
+      cssManager.rel = 'stylesheet';
+      cssManager.href = ROOT_PREFIX + '/assets/css/manager.css';
+      head.appendChild(cssManager);
+
+      // small inline style fallback while CSS loads
+      var style = document.createElement('style');
+      style.innerHTML = 'body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; color:#222; }';
+      head.appendChild(style);
+    })();
+  </script>
+</head>
+
+<body>
+  <div id="moduleLoadErrorBanner" style="display:none;padding:12px;background:#fee;border:1px solid #f99;color:#900;margin:12px;">
+    Failed to load manager dashboard script. Check console for details.
+  </div>
+
+  <div class="container">
+
+    <!-- TOP BAR -->
+    <div id="top" class="card row" style="justify-content: space-between; align-items: center;">
+      <div>
+        <h2>Manager Dashboard</h2>
+        <div id="userInfo" class="small" aria-live="polite"></div>
+      </div>
+
+      <!-- LOGOUT BUTTON (must exist in DOM for both module and fallback) -->
+      <button id="btnLogout" class="btn" type="button">Logout</button>
+    </div>
+
+    <!-- MAIN GRID -->
+    <div class="card manager-grid" style="margin-top:16px">
+
+      <!-- LEFT SIDE: Projects -->
+      <div>
+        <h3>Projects</h3>
+
+        <h4>Create Project</h4>
+        <label for="projectName">Name</label>
+        <input id="projectName" />
+
+        <label for="projectDesc">Description</label>
+        <textarea id="projectDesc"></textarea>
+
+        <button id="btnCreate" class="btn" type="button">Create</button>
+        <div id="mgrMsg" class="small" aria-live="polite"></div>
+
+        <hr>
+
+        <h4>Add Members to Project</h4>
+        <label for="memberProjectSelect">Select Project</label>
+        <select id="memberProjectSelect" aria-label="Select project to add members"></select>
+
+        <label for="memberIds">Member IDs (comma separated)</label>
+        <input id="memberIds" placeholder="ex: 2, 5, 7" />
+
+        <button id="btnAddMembers" class="btn" type="button">Add Members</button>
+        <div id="membersMsg" class="small" aria-live="polite"></div>
+      </div>
+
+      <!-- RIGHT SIDE: Tasks -->
+      <aside>
+        <h3>Project Tasks</h3>
+
+        <!-- dynamic task list -->
+        <div id="projectTasks" aria-live="polite"></div>
+
+        <hr>
+
+        <h4>Create Task</h4>
+
+        <label for="taskProjectSelect">Project</label>
+        <select id="taskProjectSelect"></select>
+
+        <label for="taskTitle">Title</label>
+        <input id="taskTitle" />
+
+        <label for="taskDesc">Description</label>
+        <textarea id="taskDesc"></textarea>
+
+        <label for="taskDue">Due Date</label>
+        <input type="date" id="taskDue" />
+
+        <label for="taskPriority">Priority (1–5)</label>
+        <select id="taskPriority">
+          <option value="1">1 — Low</option>
+          <option value="2">2</option>
+          <option value="3">3 — Medium</option>
+          <option value="4">4</option>
+          <option value="5">5 — High</option>
+        </select>
+
+        <label for="taskAssignees">Assign Users (IDs comma separated)</label>
+        <input id="taskAssignees" placeholder="ex: 1, 3" />
+
+        <button id="btnCreateTask" class="btn" type="button">Create Task</button>
+        <div id="taskMsg" class="small" aria-live="polite"></div>
+      </aside>
+
+    </div>
+  </div>
+
+  <!-- Module loader: try several likely candidate URLs and load the first that exists -->
+  <script>
+    (async function() {
+      var ROOT_PREFIX = window.__APP_ROOT_PREFIX !== undefined ? window.__APP_ROOT_PREFIX
+                        : (window.location.pathname.includes('/frontend/') ? '/frontend' : '');
+
+      // Candidate locations (ordered) - adjust or add if you use a different structure
+      var candidates = [
+        ROOT_PREFIX + '/js/manager/managerDashboard.js',
+        ROOT_PREFIX + '/pages/manager/managerDashboard.js',
+        ROOT_PREFIX + '/frontend/pages/manager/managerDashboard.js',
+        ROOT_PREFIX + '/pages/manager/managerDashboard.mjs'
+      ];
+
+      // Helper: try fetching a candidate to confirm it exists (GET to check 200)
+      async function exists(url) {
+        try {
+          var res = await fetch(url, { method: 'GET', credentials: 'include' });
+          return res && res.ok;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      var loaded = false;
+      for (var i = 0; i < candidates.length; i++) {
+        var path = candidates[i];
+        // skip falsy
+        if (!path) continue;
+        // try HEAD? some servers block HEAD; using GET is more reliable for static servers
+        if (await exists(path)) {
+          // inject module script
+          var s = document.createElement('script');
+          s.type = 'module';
+          s.src = path;
+          s.addEventListener('error', function(e) {
+            console.error('module script error loading', this.src, e);
+            document.getElementById('moduleLoadErrorBanner').style.display = 'block';
+          });
+          document.body.appendChild(s);
+          loaded = true;
+          break;
+        }
+      }
+
+      if (!loaded) {
+        // show banner and log details
+        document.getElementById('moduleLoadErrorBanner').style.display = 'block';
+        console.error('managerDashboard module not found. Tried:', candidates);
+      }
+    })();
+  </script>
+
+  <!-- Fallback logout handler: ensures logout works even if the module fails to load -->
+  <script>
+    (function() {
+      var ROOT_PREFIX = window.__APP_ROOT_PREFIX !== undefined ? window.__APP_ROOT_PREFIX
+                        : (window.location.pathname.includes('/frontend/') ? '/frontend' : '');
+      var LOGIN_PATH = ROOT_PREFIX + '/pages/auth/login.html';
+
+      async function doLogout() {
+        try {
+          await fetch(ROOT_PREFIX + '/api/logout', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Accept': 'application/json' }
+          });
+        } catch (err) {
+          console.warn('Logout request failed:', err);
+        } finally {
+          window.location.href = LOGIN_PATH;
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('btnLogout');
+        if (btn) {
+          btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            doLogout();
+          });
+        }
+      });
+    })();
+  </script>
+
+  <noscript>
+    <div style="padding: 20px; color: #900; font-weight: bold;">
+      JavaScript is required to use the manager dashboard.
+    </div>
+  </noscript>
+</body>
+</html>

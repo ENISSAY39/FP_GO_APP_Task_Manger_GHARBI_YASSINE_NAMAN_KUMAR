@@ -1,14 +1,22 @@
 package models
 
-import "gorm.io/gorm"
+import (
+	"time"
 
-// Project represents a project that contains many tasks and has many members
+	"gorm.io/gorm"
+)
+
 type Project struct {
-	gorm.Model
-	Name        string          `gorm:"not null" json:"name"`
-	Description string          `json:"description"`
-	OwnerID     uint            `json:"owner_id"`
-	Owner       User            `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
-	Tasks       []Task          `gorm:"foreignKey:ProjectID" json:"tasks,omitempty"`
-	Members     []ProjectMember `gorm:"foreignKey:ProjectID" json:"members,omitempty"`
+	ID          uint           `gorm:"primaryKey" json:"id"`
+	Name        string         `gorm:"size:150;not null" json:"name"`
+	Description string         `gorm:"type:text" json:"description,omitempty"`
+	OwnerID     uint           `gorm:"not null;index" json:"owner_id"` // référence vers user (owner principal)
+	Owner       User           `gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"-"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+
+	// Relations
+	Members []ProjectMember `gorm:"foreignKey:ProjectID" json:"members,omitempty"`
+	Tasks   []Task          `gorm:"foreignKey:ProjectID" json:"tasks,omitempty"`
 }

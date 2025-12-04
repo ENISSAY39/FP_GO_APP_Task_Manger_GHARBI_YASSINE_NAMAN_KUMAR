@@ -1,10 +1,19 @@
 package models
 
-import "time"
+import (
+	"time"
 
-// TaskAssignee is the explicit join table for many2many relation between tasks and users.
+	"gorm.io/gorm"
+)
+
 type TaskAssignee struct {
-	TaskID     uint      `gorm:"primaryKey" json:"task_id"`
-	UserID     uint      `gorm:"primaryKey" json:"user_id"`
-	AssignedAt time.Time `json:"assigned_at,omitempty"`
+	ID        uint           `gorm:"primaryKey" json:"id"`
+	TaskID    uint           `gorm:"index;not null" json:"task_id"`
+	UserID    uint           `gorm:"index;not null" json:"user_id"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+
+	User User `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-"`
+	Task Task `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-"`
 }

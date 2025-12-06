@@ -174,6 +174,52 @@ type removeMemberPayload struct {
 	UserID uint `json:"user_id" binding:"required"`
 }
 
+// removeMemberHandlerCommon centralises the actual deletion logic and checks
+func removeMemberHandlerCommon(c *gin.Context, projectID uint, targetUserID uint) {
+	// caller check
+	callerID, ok := getUserIDFromCtx(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "no user in context"})
+		return
+	}
+
+	// only owner allowed
+	isOwner, err := IsProjectOwner(projectID, callerID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+		return
+	}
+	if !isOwner {
+		c.JSON(http.StatusForbidden, gin.H{"error": "only owner can remove members"})
+		return
+	}
+
+	// don't allow removing the owner
+	var proj models.Project
+	if err := initializers.DB.First(&proj, projectID).Error; err == nil {
+		if proj.OwnerID != nil && *proj.OwnerID == targetUserID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "cannot remove project owner"})
+			return
+		}
+	}
+
+	// perform deletion by matching both project_id and user_id
+	res := initializers.DB.
+		Where("project_id = ? AND user_id = ?", projectID, targetUserID).
+		Delete(&models.ProjectMember{})
+
+	if res.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not remove member"})
+		return
+	}
+	if res.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "member not found for that project"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "member removed"})
+}
+
 func RemoveMember(c *gin.Context) {
 	pidStr := c.Param("projectId")
 	pid64, err := strconv.ParseUint(pidStr, 10, 64)
@@ -182,21 +228,6 @@ func RemoveMember(c *gin.Context) {
 		return
 	}
 	projectID := uint(pid64)
-	userID, ok := getUserIDFromCtx(c)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "no user in context"})
-		return
-	}
-
-	owner, err := IsProjectOwner(projectID, userID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
-		return
-	}
-	if !owner {
-		c.JSON(http.StatusForbidden, gin.H{"error": "only owner can remove members"})
-		return
-	}
 
 	var body removeMemberPayload
 	if err := c.ShouldBindJSON(&body); err != nil {
@@ -204,20 +235,7 @@ func RemoveMember(c *gin.Context) {
 		return
 	}
 
-	// don't allow removing the owner (project.OwnerID) via this route
-	var proj models.Project
-	if err := initializers.DB.First(&proj, projectID).Error; err == nil {
-		if proj.OwnerID != nil && *proj.OwnerID == body.UserID {
-			c.JSON(http.StatusForbidden, gin.H{"error": "cannot remove project owner"})
-			return
-		}
-	}
-
-	if err := RemoveProjectMember(projectID, body.UserID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not remove member"})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"message": "member removed"})
+	removeMemberHandlerCommon(c, projectID, body.UserID)
 }
 
 // DeleteProject: only owner can delete
@@ -270,7 +288,6 @@ func getUserIDFromCtx(c *gin.Context) (uint, bool) {
 	}
 }
 
-
 // RemoveMemberByParam handles DELETE /projects/:projectId/members/:userId
 func RemoveMemberByParam(c *gin.Context) {
 	pidStr := c.Param("projectId")
@@ -289,34 +306,5 @@ func RemoveMemberByParam(c *gin.Context) {
 	}
 	targetUserID := uint(uid64)
 
-	callerID, ok := getUserIDFromCtx(c)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "no user in context"})
-		return
-	}
-
-	isOwner, err := IsProjectOwner(projectID, callerID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
-		return
-	}
-	if !isOwner {
-		c.JSON(http.StatusForbidden, gin.H{"error": "only owner can remove members"})
-		return
-	}
-
-	// don't allow removing the project owner via this route
-	var proj models.Project
-	if err := initializers.DB.First(&proj, projectID).Error; err == nil {
-		if proj.OwnerID != nil && *proj.OwnerID == targetUserID {
-			c.JSON(http.StatusForbidden, gin.H{"error": "cannot remove project owner"})
-			return
-		}
-	}
-
-	if err := RemoveProjectMember(projectID, targetUserID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not remove member"})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"message": "member removed"})
+	removeMemberHandlerCommon(c, projectID, targetUserID)
 }

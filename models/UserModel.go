@@ -9,31 +9,23 @@ import (
 
 type User struct {
 	ID        uint           `gorm:"primaryKey" json:"id"`
-	Name      string         `gorm:"size:100;not null" json:"name"`
-	Email     string         `gorm:"size:100;uniqueIndex;not null" json:"email"`
-	Password  string         `gorm:"size:255;not null" json:"-"` // stocker le hash, ne pas renvoyer
+	Name      string         `gorm:"size:150;not null" json:"name"`
+	Email     string         `gorm:"uniqueIndex;size:200;not null" json:"email"`
+	Password  string         `gorm:"size:255;not null" json:"-"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
-
-	// Relations
-	ProjectMemberships []ProjectMember  `gorm:"foreignKey:UserID" json:"-"`
-	TasksCreated       []Task           `gorm:"foreignKey:CreatorID" json:"-"`
-	TaskAssignments    []TaskAssignee   `gorm:"foreignKey:UserID" json:"-"`
 }
 
-// SetPassword hash et stocke le mot de passe
-func (u *User) SetPassword(plain string) error {
-	hashed, err := bcrypt.GenerateFromPassword([]byte(plain), bcrypt.DefaultCost)
+func (u *User) SetPassword(pw string) error {
+	hash, err := bcrypt.GenerateFromPassword([]byte(pw), 12)
 	if err != nil {
 		return err
 	}
-	u.Password = string(hashed)
+	u.Password = string(hash)
 	return nil
 }
 
-// CheckPassword compare hash et mot de passe fourni
-func (u *User) CheckPassword(plain string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(plain))
-	return err == nil
+func (u *User) CheckPassword(pw string) bool {
+	return bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(pw)) == nil
 }

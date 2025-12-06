@@ -1,1 +1,252 @@
-<table style="width:100%; border:2px solid #555; border-collapse:collapse;"> <tr style="background:#222; color:#fff; border:2px solid #555;"> <th style="padding:10px; border:2px solid #555;">Section</th> <th style="padding:10px; border:2px solid #555;">Details</th> </tr> <tr style="background:#111; color:#ddd;"> <td style="padding:10px; border:2px solid #555;">Project Name</td> <td style="padding:10px; border:2px solid #555;"><b>Task Manager Backend (Go + Gin + GORM + JWT)</b></td> </tr> <tr style="background:#181818; color:#ddd;"> <td style="padding:10px; border:2px solid #555;">Description</td> <td style="padding:10px; border:2px solid #555;">Backend service for authentication, project management, task handling, and permission control.</td> </tr> <tr style="background:#111; color:#ddd;"> <td style="padding:10px; border:2px solid #555;">Tech Stack</td> <td style="padding:10px; border:2px solid #555;">Go, Gin, GORM, MySQL, JWT, CORS, Middleware</td> </tr> <tr style="background:#181818; color:#ddd;"> <td style="padding:10px; border:2px solid #555;">Project Structure</td> <td style="padding:10px; border:2px solid #555;"> <pre> controllers/ authController.go usersController.go projectsController.go tasksController.go models/ middleware/ initializers/ frontend/ main.go </pre> </td> </tr> <tr style="background:#111; color:#ddd;"> <td style="padding:10px; border:2px solid #555;">Environment Variables</td> <td style="padding:10px; border:2px solid #555;"> <pre> DB_URL=root:password@tcp(localhost:3306)/task_manager?parseTime=true JWT_SECRET=your-secret PORT=3000 </pre> </td> </tr> <tr style="background:#181818; color:#ddd;"> <td style="padding:10px; border:2px solid #555;">Run Server</td> <td style="padding:10px; border:2px solid #555;"><code>go run main.go</code></td> </tr> <tr style="background:#111; color:#ddd;"> <td style="padding:10px; border:2px solid #555;">Auth APIs</td> <td style="padding:10px; border:2px solid #555;"> POST /api/signup<br> POST /api/login<br> GET /api/validate<br> POST /api/logout </td> </tr> <tr style="background:#181818; color:#ddd;"> <td style="padding:10px; border:2px solid #555;">Project APIs</td> <td style="padding:10px; border:2px solid #555;"> POST /api/projects<br> GET /api/projects<br> GET /api/projects/:projectId<br> DELETE /api/projects/:projectId </td> </tr> <tr style="background:#111; color:#ddd;"> <td style="padding:10px; border:2px solid #555;">Task APIs</td> <td style="padding:10px; border:2px solid #555;"> POST /api/projects/:projectId/tasks<br> GET /api/projects/:projectId/tasks<br> PUT /api/tasks/:taskId<br> DELETE /api/tasks/:taskId<br> PUT /api/tasks/:taskId/assign<br> PUT /api/tasks/:taskId/unassign </td> </tr> <tr style="background:#181818; color:#ddd;"> <td style="padding:10px; border:2px solid #555;">Permissions</td> <td style="padding:10px; border:2px solid #555;"> ✔ Owner can do everything<br> ✔ Members can create/update their own tasks<br> ✘ Members cannot delete project or remove members </td> </tr> <tr style="background:#111; color:#ddd;"> <td style="padding:10px; border:2px solid #555;">Models</td> <td style="padding:10px; border:2px solid #555;"> User, Project, ProjectMember, Task, TaskAssignee </td> </tr> <tr style="background:#181818; color:#ddd;"> <td style="padding:10px; border:2px solid #555;">Developers</td> <td style="padding:10px; border:2px solid #555;"> <b>Naman Kumar</b><br> <b>Yassine Gharbi</b> </td> </tr> </table>
+# Backend API Documentation
+
+This document describes the backend architecture and API endpoints for the Task Manager application built with **Go (Gin)**, **GORM**, and **JWT Authentication**.
+
+---
+
+## 📌 Overview
+
+The backend handles:
+
+* User Authentication (Signup, Login)
+* Project Management (Create, List, Delete, Membership Control)
+* Task Management (Create, Update, Assign, List)
+* Role-Based Permissions
+
+The project follows a modular structure:
+
+```
+controllers/
+    authController.go
+    projectsControllers.go
+    tasksControllers.go
+    permission_helpers.go
+models/
+initializers/
+middlewares/
+routes/
+```
+
+---
+
+## 🔐 Authentication
+
+### **POST /signup** – Create a New User
+
+**Request Body:**
+
+```json
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "password": "secret123"
+}
+```
+
+**Validations:**
+
+* Name ≥ 2 characters
+* Valid email
+* Password ≥ 6 characters
+
+**Response:**
+
+```json
+{
+  "user": {
+    "id": 1,
+    "name": "John Doe",
+    "email": "john@example.com"
+  }
+}
+```
+
+---
+
+### **POST /login** – Login & Get JWT Token
+
+**Request Body:**
+
+```json
+{
+  "email": "john@example.com",
+  "password": "secret123"
+}
+```
+
+**Response:**
+
+```json
+{
+  "token": "<jwt-token>",
+  "user": { "id": 1, "name": "John Doe", "email": "john@example.com" }
+}
+```
+
+Token contains:
+
+* `sub`: user ID
+* `exp`: expiry (24h)
+
+---
+
+## 📁 Project Management
+
+All project routes require **JWT authentication**.
+
+### **POST /projects** – Create Project
+
+Request Body:
+
+```json
+{
+  "name": "My Project",
+  "description": "Project description"
+}
+```
+
+The creator becomes:
+
+* Project Owner
+* Project Member with role "OWNER"
+
+---
+
+### **GET /projects/my** – Get All Projects of Logged-in User
+
+Returns list of projects where the user is a member.
+
+---
+
+### **GET /projects/:projectId** – Get Project Details
+
+Only accessible if user is a project member.
+Loads:
+
+* Members
+* Tasks
+
+---
+
+### **DELETE /projects/:projectId** – Delete Project
+
+Only owner can delete.
+
+---
+
+## 👥 Project Members
+
+### **POST /projects/:projectId/members** – Add Member (OWNER Only)
+
+Body:
+
+```json
+{
+  "user_id": 5,
+  "role": "MEMBER" // optional
+}
+```
+
+### **DELETE /projects/:projectId/members** – Remove Member
+
+Body:
+
+```json
+{
+  "user_id": 5
+}
+```
+
+Owner cannot remove themselves.
+
+---
+
+## 📝 Task Management
+
+### **POST /projects/:projectId/tasks** – Create Task
+
+Members only.
+
+Fields:
+
+```json
+{
+  "title": "Task Name",
+  "description": "Optional text",
+  "priority": "HIGH", // optional
+  "due_date": "2025-01-20T10:00:00Z"
+}
+```
+
+---
+
+### **GET /projects/:projectId/tasks** – List Tasks
+
+Includes task assignees.
+
+---
+
+### **PATCH /tasks/:taskId** – Update Task
+
+Allowed by:
+
+* Task creator OR
+* Project owner
+
+Partial update fields:
+
+```json
+{
+  "title": "New title",
+  "status": "DONE",
+  "priority": "LOW"
+}
+```
+
+---
+
+## 🔑 Roles & Permission Logic
+
+Defined in `permission_helpers.go`:
+
+* `IsProjectOwner(projectID, userID)`
+* `IsProjectMember(projectID, userID)`
+* `AddProjectMember()`
+* `RemoveProjectMember()`
+
+Roles:
+
+* **OWNER** – full permissions
+* **MEMBER** – limited to tasks + viewing
+
+---
+
+## 🧱 Models (Summary)
+
+* User
+* Project
+* Task
+* ProjectMember (pivot table)
+
+---
+
+## 🚀 Running the Server
+
+### Environment Variables
+
+```
+JWT_SECRET=your_secret_key
+DB_URL=mysql://user:password@tcp(127.0.0.1:3306)/dbname
+```
+
+### Start Server
+
+```
+go run main.go
+```
+
+---
+
+## 📬 Contact
+
+For improvements or bugs, please reach out.

@@ -105,8 +105,17 @@ func main() {
 		api.GET("/projects/:projectId/tasks", middleware.RequireAuth(), controllers.GetProjectTasks) //marche
 		api.PUT("/tasks/:taskId", middleware.RequireAuth(), controllers.UpdateTask) //marche 
 		api.DELETE("/tasks/:taskId", middleware.RequireAuth(), controllers.DeleteTask) //marche 
-		api.PUT("/tasks/:taskId/assign", middleware.RequireAuth(), controllers.AssignTask) //marche pas 
-		api.PUT("/tasks/:taskId/unassign", middleware.RequireAuth(), controllers.UnassignTask) //marche pas
+
+
+		// keeping existing PUT route
+		api.PUT("/tasks/:taskId/assign", middleware.RequireAuth(), controllers.AssignTask)
+		api.PUT("/tasks/:taskId/unassign", middleware.RequireAuth(), controllers.UnassignTask)
+
+		// add POST route matching front-end: /api/projects/:projectId/tasks/:taskId/assign
+		api.POST("/projects/:projectId/tasks/:taskId/assign", middleware.RequireAuth(), controllers.AssignTask) //marche
+		// (optionnel) also accept POST without project if your front may call that
+		api.POST("/tasks/:taskId/assign", middleware.RequireAuth(), controllers.AssignTask) //marche
+
 	}
 
 	// -------------------- START SERVER --------------------

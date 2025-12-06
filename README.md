@@ -1,252 +1,163 @@
-# Backend API Documentation
-
-This document describes the backend architecture and API endpoints for the Task Manager application built with **Go (Gin)**, **GORM**, and **JWT Authentication**.
-
----
-
-## 📌 Overview
+📌 Overview
 
 The backend handles:
 
-* User Authentication (Signup, Login)
-* Project Management (Create, List, Delete, Membership Control)
-* Task Management (Create, Update, Assign, List)
-* Role-Based Permissions
+User Authentication (Signup, Login, Logout, Token Validation)
 
-The project follows a modular structure:
+Project Management (Create, List, View, Delete, Member Control)
 
-```
+Task Management (Create, Update, Assign, Unassign, List)
+
+Role-Based Permissions
+
+Automatic Frontend Serving (Vite/React)
+
+📁 Project Structure
 controllers/
     authController.go
     projectsControllers.go
     tasksControllers.go
     permission_helpers.go
+
 models/
+    User.go
+    Project.go
+    ProjectMember.go
+    Task.go
+    TaskAssignee.go
+
 initializers/
-middlewares/
-routes/
-```
+    loadEnv.go
+    database.go
+    sync.go
 
----
+middleware/
+    auth.go
 
-## 🔐 Authentication
+frontend/
+    dist/ or build/ (auto-served if exists)
 
-### **POST /signup** – Create a New User
+main.go
 
-**Request Body:**
+⚙️ Environment Setup
+1. Clone the repository
+git clone <your-repository-url>
+cd <project-folder>
 
-```json
-{
-  "name": "John Doe",
-  "email": "john@example.com",
-  "password": "secret123"
-}
-```
+2. Install dependencies
+go mod tidy
 
-**Validations:**
+3. Create .env file
+DB_URL="root:password@tcp(localhost:3306)/task_manager?parseTime=true"
+JWT_SECRET="your-secret-key"
+PORT=3000
 
-* Name ≥ 2 characters
-* Valid email
-* Password ≥ 6 characters
-
-**Response:**
-
-```json
-{
-  "user": {
-    "id": 1,
-    "name": "John Doe",
-    "email": "john@example.com"
-  }
-}
-```
-
----
-
-### **POST /login** – Login & Get JWT Token
-
-**Request Body:**
-
-```json
-{
-  "email": "john@example.com",
-  "password": "secret123"
-}
-```
-
-**Response:**
-
-```json
-{
-  "token": "<jwt-token>",
-  "user": { "id": 1, "name": "John Doe", "email": "john@example.com" }
-}
-```
-
-Token contains:
-
-* `sub`: user ID
-* `exp`: expiry (24h)
-
----
-
-## 📁 Project Management
-
-All project routes require **JWT authentication**.
-
-### **POST /projects** – Create Project
-
-Request Body:
-
-```json
-{
-  "name": "My Project",
-  "description": "Project description"
-}
-```
-
-The creator becomes:
-
-* Project Owner
-* Project Member with role "OWNER"
-
----
-
-### **GET /projects/my** – Get All Projects of Logged-in User
-
-Returns list of projects where the user is a member.
-
----
-
-### **GET /projects/:projectId** – Get Project Details
-
-Only accessible if user is a project member.
-Loads:
-
-* Members
-* Tasks
-
----
-
-### **DELETE /projects/:projectId** – Delete Project
-
-Only owner can delete.
-
----
-
-## 👥 Project Members
-
-### **POST /projects/:projectId/members** – Add Member (OWNER Only)
-
-Body:
-
-```json
-{
-  "user_id": 5,
-  "role": "MEMBER" // optional
-}
-```
-
-### **DELETE /projects/:projectId/members** – Remove Member
-
-Body:
-
-```json
-{
-  "user_id": 5
-}
-```
-
-Owner cannot remove themselves.
-
----
-
-## 📝 Task Management
-
-### **POST /projects/:projectId/tasks** – Create Task
-
-Members only.
-
-Fields:
-
-```json
-{
-  "title": "Task Name",
-  "description": "Optional text",
-  "priority": "HIGH", // optional
-  "due_date": "2025-01-20T10:00:00Z"
-}
-```
-
----
-
-### **GET /projects/:projectId/tasks** – List Tasks
-
-Includes task assignees.
-
----
-
-### **PATCH /tasks/:taskId** – Update Task
-
-Allowed by:
-
-* Task creator OR
-* Project owner
-
-Partial update fields:
-
-```json
-{
-  "title": "New title",
-  "status": "DONE",
-  "priority": "LOW"
-}
-```
-
----
-
-## 🔑 Roles & Permission Logic
-
-Defined in `permission_helpers.go`:
-
-* `IsProjectOwner(projectID, userID)`
-* `IsProjectMember(projectID, userID)`
-* `AddProjectMember()`
-* `RemoveProjectMember()`
-
-Roles:
-
-* **OWNER** – full permissions
-* **MEMBER** – limited to tasks + viewing
-
----
-
-## 🧱 Models (Summary)
-
-* User
-* Project
-* Task
-* ProjectMember (pivot table)
-
----
-
-## 🚀 Running the Server
-
-### Environment Variables
-
-```
-JWT_SECRET=your_secret_key
-DB_URL=mysql://user:password@tcp(127.0.0.1:3306)/dbname
-```
-
-### Start Server
-
-```
+4. Start the server
 go run main.go
-```
 
----
 
-## 📬 Contact
+Server runs at:
+http://localhost:3000
 
-For improvements or bugs, please reach out.
+🌐 Frontend Handling
+
+The backend automatically serves your frontend from these folders:
+
+frontend/dist
+frontend/build
+public
+
+
+If found:
+
+Static assets served from /
+
+Fallback to index.html for SPA routing
+
+If not found:
+
+No frontend build found (API-only mode)
+
+🔑 Authentication API
+Signup
+POST /api/signup
+
+Login
+POST /api/login
+
+Validate Token
+GET /api/validate
+
+Logout
+POST /api/logout
+
+📁 Projects API
+Create Project
+POST /api/projects
+
+List User Projects
+GET /api/projects
+
+Project Details
+GET /api/projects/:projectId
+
+Delete Project (Owner only)
+DELETE /api/projects/:projectId
+
+👥 Project Members API
+Add Member
+POST /api/projects/:projectId/members
+
+Remove Member
+DELETE /api/projects/:projectId/members/:userId
+
+📝 Task API
+Create Task
+POST /api/projects/:projectId/tasks
+
+List Tasks
+GET /api/projects/:projectId/tasks
+
+Update Task
+PUT /api/tasks/:taskId
+
+Delete Task
+DELETE /api/tasks/:taskId
+
+Assign Task
+PUT /api/tasks/:taskId/assign
+
+Unassign Task
+PUT /api/tasks/:taskId/unassign
+
+🎯 Permission Rules
+Action	Owner	Member
+Create task	✔	✔
+Update task	✔	Creator only
+Delete task	✔	Creator only
+Add/remove members	✔	✘
+Delete project	✔	✘
+🛢 Database Models
+User
+
+ID, Name, Email, PasswordHash
+
+Project
+
+ID, Name, Description, OwnerID
+
+ProjectMember
+
+ProjectID, UserID, Role
+
+Task
+
+Title, Description, Status, Priority, ProjectID, CreatorID
+
+TaskAssignee
+
+TaskID, UserID
+
+👨‍💻 Developers
+
+Yassine Gharbi & Naman Kumar

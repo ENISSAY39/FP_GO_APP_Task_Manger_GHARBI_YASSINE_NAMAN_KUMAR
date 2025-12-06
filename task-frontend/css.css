@@ -1,0 +1,28 @@
+    /* Simple dark UI, no libs */
+    :root {
+      --bg: #0f1113;
+      --card: #141617;
+      --muted: #9aa0a6;
+      --accent: #0a84ff;
+      --danger: #ff4d4d;
+    }
+    html,body { height:100%; margin:0; font-family:Inter, Arial, Helvetica, sans-serif; background:var(--bg); color:#eee; }
+    .wrap { width:95%; max-width:1100px; margin:18px auto; }
+    .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    .card { background:var(--card); padding:14px; border-radius:10px; box-shadow: 0 4px 20px rgba(0,0,0,0.6); margin-bottom:16px; }
+    input, select, textarea { width:100%; padding:8px 10px; margin-top:6px; border-radius:6px; border:1px solid rgba(255,255,255,0.04); background:#0f1113; color:#eee; box-sizing:border-box; }
+    label { font-size:13px; color:var(--muted); }
+    button { background:var(--accent); color:white; border:none; padding:8px 12px; border-radius:8px; cursor:pointer; }
+    button.ghost { background:transparent; border:1px solid rgba(255,255,255,0.06); color: #eee; }
+    button.warn { background:var(--danger); }
+    h1,h2 { margin:0; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); gap:12px; }
+    .project-card { padding:10px; background:#0b0c0d; border-radius:8px; }
+    pre { background:#000; padding:12px; border-radius:6px; color:#0f0; overflow:auto; max-height:300px; }
+    .small { font-size:13px; color:var(--muted); }
+    .muted { color:var(--muted); font-size:13px; }
+    .btn-row { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
+    .member-row, .task-row { border-radius:6px; padding:8px; background:#0b0b0b; margin-bottom:8px; }
+    .controls { display:flex; gap:8px; align-items:center; }
+    .inline { display:inline-flex; gap:8px; align-items:center; }
+    .danger { color:var(--danger); }

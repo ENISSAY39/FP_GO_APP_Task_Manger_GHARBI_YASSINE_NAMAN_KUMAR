@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Project Manager — Front (all-in-one)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="css.css">
+
+</head>
+<body>
+  <div class="wrap">
+
+    <h1>Project Manager — Front (central UI)</h1>
+    <div class="card">
+      <div class="row">
+        <div style="flex:1">
+          <label>API base</label>
+          <input id="apiBase" value="http://localhost:3000" />
+        </div>
+
+        <div style="width:360px">
+          <label>Bearer token (paste or login below)</label>
+          <input id="jwt" placeholder="Paste JWT here or login" />
+        </div>
+
+        <div style="width:140px">
+          <label>&nbsp;</label>
+          <div class="row">
+            <button id="btnLoad">Load projects</button>
+            <button id="btnClearToken" class="ghost">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:10px;" class="small">Tip: login with email/password (panel below) to auto-set token.</div>
+    </div>
+
+    <!-- LOGIN -->
+    <div class="card">
+      <h2>Login</h2>
+      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <div style="min-width:240px; flex:1">
+          <label>Email</label>
+          <input id="loginEmail" placeholder="alice@example.com" value="alice@example.com" />
+        </div>
+        <div style="width:220px">
+          <label>Password</label>
+          <input id="loginPass" placeholder="secret" value="secret123" type="password" />
+        </div>
+        <div style="width:200px; align-self:end">
+          <div class="row">
+            <button id="btnLogin">Login</button>
+            <button id="btnLogout" class="ghost">Logout</button>
+          </div>
+        </div>
+      </div>
+      <div id="loginMsg" class="small muted" style="margin-top:8px"></div>
+    </div>
+
+    <!-- Create Project -->
+    <div class="card">
+      <h2>Create project</h2>
+      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <div style="flex:1">
+          <label>Name</label>
+          <input id="pName" placeholder="Project name" />
+        </div>
+        <div style="flex:2">
+          <label>Description</label>
+          <input id="pDesc" placeholder="Description" />
+        </div>
+        <div style="width:140px; align-self:end">
+          <button id="btnCreateProject">Create</button>
+        </div>
+      </div>
+      <div id="pStatus" class="small muted" style="margin-top:8px"></div>
+    </div>
+
+    <!-- Projects + controls -->
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2>Projects</h2>
+        <div class="small">Click "View" to open project details (members & tasks).</div>
+      </div>
+
+      <div id="projectsWrap" class="grid" style="margin-top:10px"></div>
+    </div>
+
+    <!-- Project detail pane -->
+    <div id="detailCard" class="card" style="display:none;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h2 id="detailTitle">Project detail</h2>
+          <div class="small" id="detailInfo"></div>
+        </div>
+        <div>
+          <button id="btnRefreshDetail" class="ghost">Refresh</button>
+          <button id="btnCloseDetail" class="ghost">Close</button>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:12px; margin-top:12px; flex-wrap:wrap;">
+        <!-- Members -->
+        <div style="flex:1; min-width:320px;">
+          <h3>Members</h3>
+          <div id="membersList"></div>
+
+          <div style="margin-top:8px;">
+            <label>Add member (user id)</label>
+            <div style="display:flex; gap:8px;">
+              <input id="newMemberId" placeholder="user id (number)" />
+              <select id="newMemberRole">
+                <option value="MEMBER">MEMBER</option>
+                <option value="OWNER">OWNER</option>
+              </select>
+              <button id="btnAddMember">Add</button>
+            </div>
+            <div class="small muted" style="margin-top:6px">You can also remove by clicking the trash on each member (owner cannot remove owner via UI).</div>
+          </div>
+        </div>
+
+        <!-- Tasks -->
+        <div style="flex:1; min-width:360px;">
+          <h3>Tasks</h3>
+          <div id="tasksList"></div>
+
+          <div style="margin-top:8px;">
+            <label>Create task</label>
+            <input id="tTitle" placeholder="title" />
+            <input id="tDesc" placeholder="description" style="margin-top:6px" />
+            <select id="tPriority" style="margin-top:6px">
+              <option>LOW</option><option selected>MEDIUM</option><option>HIGH</option>
+            </select>
+            <div style="margin-top:8px; display:flex; gap:8px;">
+              <button id="btnCreateTask">Create task</button>
+              <button id="btnBulkAssign" class="ghost">Assign me to all</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px;">
+        <h3>Raw response</h3>
+        <pre id="rawDetail"></pre>
+      </div>
+    </div>
+
+    <!-- Global raw area -->
+    <div class="card">
+      <h2>Raw response</h2>
+      <pre id="raw"></pre>
+    </div>
+
+  </div>
+
+<script src="script.js"></script>
+</body>
+</html>

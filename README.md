@@ -13,18 +13,7 @@ The backend handles:
 * Task Management (Create, Update, Assign, List)
 * Role-Based Permissions
 
-The project follows a modular structure:
 
-```
-controllers/
-    authController.go
-    projectsControllers.go
-    tasksControllers.go
-    permission_helpers.go
-models/
-initializers/
-middlewares/
-routes/
 ```
 
 

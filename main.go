@@ -86,30 +86,27 @@ func main() {
 			c.JSON(http.StatusOK, gin.H{"ok": true, "userID": v})
 		})
 
-		// Logout
-		api.POST("/logout", middleware.RequireAuth(), func(c *gin.Context) {
-			c.SetCookie("token", "", -1, "/", "", false, true)
-			c.JSON(http.StatusOK, gin.H{"message": "logged out"})
-		})
+			// Logout
+		api.POST("/logout", middleware.RequireAuth(), controllers.Logout)
 
 		// Projects
-		api.POST("/projects", middleware.RequireAuth(), controllers.CreateProject)
-		api.GET("/projects", middleware.RequireAuth(), controllers.GetMyProjects)
-		api.GET("/projects/:projectId", middleware.RequireAuth(), controllers.GetProjectDetail)
-		api.DELETE("/projects/:projectId", middleware.RequireAuth(), controllers.DeleteProject)
+		api.POST("/projects", middleware.RequireAuth(), controllers.CreateProject) //marche 
+		api.GET("/projects", middleware.RequireAuth(), controllers.GetMyProjects) //marche
+		api.GET("/projects/:projectId", middleware.RequireAuth(), controllers.GetProjectDetail) //marche
+		api.DELETE("/projects/:projectId", middleware.RequireAuth(), controllers.DeleteProject) 
 
 		// Members
-		api.POST("/projects/:projectId/members", middleware.RequireAuth(), controllers.AddMember)
-		api.DELETE("/projects/:projectId/members/:userId", middleware.RequireAuth(), controllers.RemoveMemberByParam)
+		api.POST("/projects/:projectId/members", middleware.RequireAuth(), controllers.AddMember) //marche
+		api.DELETE("/projects/:projectId/members/:userId", middleware.RequireAuth(), controllers.RemoveMemberByParam) //marche
 		
 
 		// Tasks
-		api.POST("/projects/:projectId/tasks", middleware.RequireAuth(), controllers.CreateTask)
-		api.GET("/projects/:projectId/tasks", middleware.RequireAuth(), controllers.GetProjectTasks)
-		api.PUT("/tasks/:taskId", middleware.RequireAuth(), controllers.UpdateTask)
-		api.DELETE("/tasks/:taskId", middleware.RequireAuth(), controllers.DeleteTask)
-		api.PUT("/tasks/:taskId/assign", middleware.RequireAuth(), controllers.AssignTask)
-		api.PUT("/tasks/:taskId/unassign", middleware.RequireAuth(), controllers.UnassignTask)
+		api.POST("/projects/:projectId/tasks", middleware.RequireAuth(), controllers.CreateTask) //marche
+		api.GET("/projects/:projectId/tasks", middleware.RequireAuth(), controllers.GetProjectTasks) //marche
+		api.PUT("/tasks/:taskId", middleware.RequireAuth(), controllers.UpdateTask) //marche 
+		api.DELETE("/tasks/:taskId", middleware.RequireAuth(), controllers.DeleteTask) //marche 
+		api.PUT("/tasks/:taskId/assign", middleware.RequireAuth(), controllers.AssignTask) //marche pas 
+		api.PUT("/tasks/:taskId/unassign", middleware.RequireAuth(), controllers.UnassignTask) //marche pas
 	}
 
 	// -------------------- START SERVER --------------------

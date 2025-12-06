@@ -82,6 +82,8 @@ document.addEventListener("click", async (ev) => {
     setStatusRaw("Token cleared");
   } else if (ev.target.matches("#btnLogin")) {
     await handleLogin();
+  } else if (ev.target.matches("#btnLogout")) {
+    await handleLogout();
   } else if (ev.target.matches("#btnCreateProject")) {
     await handleCreateProject();
   } else if (ev.target.matches(".btnView")) {
@@ -104,7 +106,7 @@ document.addEventListener("click", async (ev) => {
     if (!confirm("Remove user "+uid+" from project?")) return;
     await removeMemberByParam(pid, uid);
     await openDetail(pid, true);
-  } else if (ev.target.matches(".btnCreateTask")) {
+  } else if (ev.target.matches("#btnCreateTask")) {
     await handleCreateTask();
   } else if (ev.target.matches(".btnAssign")) {
     const pid = el("detailCard").dataset.projectId;
@@ -124,9 +126,6 @@ document.addEventListener("click", async (ev) => {
     const pid = el("detailCard").dataset.projectId;
     const taskId = ev.target.dataset.taskid;
     await promptEditTask(pid, taskId);
-  } else if (ev.target.matches("#btnLogout")) {
-    console.debug("delegated click: #btnLogout");
-    try { await handleLogout(); } catch (e) { console.error("handleLogout threw:", e); }
   } else if (ev.target.matches(".btnDelTask")) {
     const pid = el("detailCard").dataset.projectId;
     const taskId = ev.target.dataset.taskid;
@@ -166,22 +165,21 @@ async function handleLogin(){
 
 // logout
 async function handleLogout(){
-  console.debug("handleLogout called");
   try {
     el("loginMsg").textContent = "Logging out...";
     const r = await apiFetch("/api/logout", { method: "POST" });
     if (!r.ok) {
       el("loginMsg").textContent = "Logout failed: " + (r.json?.error || r.status);
-      console.warn("logout response not ok:", r);
       return;
     }
     // clear token + UI
     el("jwt").value = "";
     el("loginMsg").textContent = "Logged out.";
     setStatusRaw("Logged out");
-    console.debug("logout success");
+    // Clear projects display
+    el("projectsWrap").innerHTML = "";
+    closeDetail();
   } catch (err) {
-    console.error("logout error:", err);
     el("loginMsg").textContent = "Logout error: " + (err && err.message ? err.message : String(err));
   }
 }
@@ -394,14 +392,6 @@ function closeDetail() {
 
 // small helper set global raw
 function setStatusRaw(txt) { el("raw").textContent = txt; }
-
-// initial bindings
-document.getElementById("btnLogin").addEventListener("click", handleLogin);
-const btnLogoutEl = document.getElementById("btnLogout");
-if (btnLogoutEl) btnLogoutEl.addEventListener("click", handleLogout);
-document.getElementById("btnLoad").addEventListener("click", loadProjects);
-document.getElementById("btnCreateProject").addEventListener("click", handleCreateProject);
-document.getElementById("btnCloseDetail").addEventListener("click", closeDetail);
 
 // convenience: auto-load projects if token present on page open
 (async function init(){

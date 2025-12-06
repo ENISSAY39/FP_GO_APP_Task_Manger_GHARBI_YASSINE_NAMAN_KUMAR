@@ -242,3 +242,8 @@ go run main.go
 ## 📬 Contact
 
 For improvements or bugs, please reach out.
+
+### Youtube video demo 
+# Part 1 : https://youtu.be/P7U-sndT01s?si=lOebn4MTsTAGDeS_
+# Part 2 : https://youtu.be/cLzsbtYu3Bc?si=_9TMtCdEcNZj6Jf9
+

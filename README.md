@@ -13,6 +13,18 @@ The backend handles:
 * Task Management (Create, Update, Assign, List)
 * Role-Based Permissions
 
+## Contribution : 
+### Gharbi Yassine : 
+  - Auth
+  - Permission heleper
+  - Project Model and controller
+  - Project Member models 
+  - Users Models  
+  - Require Auth
+
+### Naman : 
+  - Tasks Model and Controller 
+  - TaskAssignee Model 
 
 
 

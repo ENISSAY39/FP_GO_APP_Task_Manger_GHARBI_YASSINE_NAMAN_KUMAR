@@ -1,5 +1,5 @@
 import { handleLogin, handleSignup, handleLogout } from "./scripts/auth.js";
-import { loadProjects, openDetail, } from "./scripts/projects.js";
+import { loadProjects, openDetail, handleCreateProject, closeDetail } from "./scripts/projects.js";
 import { handleCreateTask, loadTasksIntoRaw, assignUserToTask, unassignUserFromTask, promptEditTask, deleteTask, bulkAssign } from "./scripts/tasks.js";
 import { handleAddMember, removeMemberByParam } from "./scripts/members.js";
 import { apiFetch } from "./scripts/api.js";

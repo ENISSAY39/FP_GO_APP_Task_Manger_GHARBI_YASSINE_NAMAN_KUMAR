@@ -220,3 +220,10 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 package.json
+
+# Agent
+CLAUDE.md
+
+
+# envirement variables
+.env

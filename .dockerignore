@@ -1,0 +1,16 @@
+.git
+.gitignore
+CLAUDE.md
+README.md
+*.md
+
+# secrets — never baked into the image, only mounted at runtime
+.env
+.envrc
+
+# large / rebuilt artifacts
+*.exe
+frontend/node_modules
+frontend/dist
+frontend/build
+node_modules

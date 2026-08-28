@@ -228,3 +228,11 @@ CLAUDE.md
 
 # envirement variables
 .env
+# --- Node / React frontend: re-include files the rules above wrongly hide ---
+# "lib/" comes from the Python template and was also matching frontend/src/lib/
+# (the API client, session and auth guards). package.json and its lockfile are
+# required to build the project: npm install locally, and `npm ci` in the
+# Dockerfile. Without them a fresh clone cannot build at all.
+!frontend/src/lib/
+!package.json
+!package-lock.json

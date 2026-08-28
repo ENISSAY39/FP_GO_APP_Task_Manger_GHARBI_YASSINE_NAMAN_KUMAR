@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -61,11 +62,33 @@ func main() {
 		abs, _ := filepath.Abs(found)
 		log.Printf("Serving frontend from %s\n", abs)
 
-		// Serve static assets (React/Vite/etc.)
-		router.Static("/", found)
+		// NOTE: do NOT use router.Static("/", found) here.
+		// It registers a catch-all "GET /*filepath" route, which makes Gin
+		// panic at startup ("conflicts with existing wildcard") as soon as the
+		// /api/... GET routes below are registered. Serving the build output
+		// from NoRoute keeps the API routes intact and still serves every file
+		// produced by `npm run build` (index.html, login.html, assets/...).
+		fileServer := http.FileServer(http.Dir(found))
 
-		// SPA fallback (React Router, Vue Router, etc.)
 		router.NoRoute(func(c *gin.Context) {
+			reqPath := c.Request.URL.Path
+
+			// Unknown API routes must answer JSON, never the HTML shell.
+			if strings.HasPrefix(reqPath, "/api/") {
+				c.JSON(http.StatusNotFound, gin.H{"error": "route not found"})
+				return
+			}
+
+			// path.Clean on a rooted path strips any ../ before we touch disk.
+			rel := strings.TrimPrefix(path.Clean("/"+reqPath), "/")
+			candidate := filepath.Join(found, filepath.FromSlash(rel))
+
+			if stat, err := os.Stat(candidate); err == nil && !stat.IsDir() {
+				fileServer.ServeHTTP(c.Writer, c.Request)
+				return
+			}
+
+			// Directory or unknown path -> landing page.
 			c.File(filepath.Join(found, "index.html"))
 		})
 

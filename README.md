@@ -40,10 +40,11 @@ A full-stack task management application built with:
 - Member permissions
 
 ## Frontend
-- React + Vite architecture
-- Modular frontend structure
-- API-based communication
-- Dynamic project/task rendering
+- Multi-page React + Vite application (5 separate HTML pages)
+- Tailwind CSS dark interface
+- Token stored in localStorage, never shown or pasted by hand
+- Guarded pages that redirect visitors who are not logged in
+- Modals, inline validation and toasts instead of browser dialogs
 
 ---
 
@@ -58,9 +59,9 @@ A full-stack task management application built with:
 - Docker
 
 ## Frontend
-- React
-- Vite
-- Modular JavaScript architecture
+- React 19
+- Vite (multi-page build)
+- Tailwind CSS v4
 
 ---
 
@@ -76,22 +77,24 @@ project-root/
 ├── main.go
 ├── docker-compose.yml
 │
+├── Dockerfile
+│
 ├── frontend/
+│   ├── index.html          # one HTML file per page
+│   ├── login.html
+│   ├── signup.html
+│   ├── projects.html
+│   ├── project.html
+│   │
 │   ├── src/
-│   │   ├── scripts/
-│   │   │   ├── api.js
-│   │   │   ├── auth.js
-│   │   │   ├── projects.js
-│   │   │   ├── tasks.js
-│   │   │   ├── members.js
-│   │   │   └── utils.js
-│   │   │
-│   │   ├── styles/
-│   │   ├── App.jsx
-│   │   ├── main.jsx
-│   │   └── main.js
+│   │   ├── entries/        # one React entry point per HTML page
+│   │   ├── pages/          # one component per page
+│   │   ├── components/     # shared components (ui/ holds the primitives)
+│   │   ├── lib/            # api client, session, auth guards, helpers
+│   │   └── styles/
 │   │
 │   ├── public/
+│   ├── vite.config.js
 │   └── package.json
 │
 └── README.md
@@ -270,6 +273,9 @@ Frontend runs on:
 http://localhost:5173
 ```
 
+The dev server proxies `/api` to the Go backend on port 3000, so log in and
+everything else works exactly as it does in the Docker setup.
+
 ---
 
 # Database Migration
@@ -286,19 +292,45 @@ No manual SQL setup required.
 
 # Frontend Architecture
 
-The frontend was migrated from a single large JavaScript file to a modular React
-architecture.
+The frontend is a **multi-page application**: each screen is its own HTML file
+with its own React entry point, and moving between screens is a normal browser
+navigation. There is no client-side router.
 
-## Main Modules
+## Pages
 
-| File          | Responsibility          |
-| ------------- | ----------------------- |
-| `auth.js`     | Login / Signup / Logout |
-| `projects.js` | Project management      |
-| `tasks.js`    | Task management         |
-| `members.js`  | Members management      |
-| `api.js`      | API fetch helper        |
-| `utils.js`    | Shared utilities        |
+| Page            | File            | Access                      | Content                                    |
+| --------------- | --------------- | --------------------------- | ------------------------------------------ |
+| Landing         | `index.html`    | public (redirects if logged in) | Presentation and links to log in / sign up |
+| Log in          | `login.html`    | public                      | Login form                                 |
+| Sign up         | `signup.html`   | public                      | Account creation, then automatic login     |
+| Projects        | `projects.html` | protected                   | Project list, creation, deletion           |
+| Project detail  | `project.html?id=<id>` | protected            | Members and tasks of one project           |
+
+## Folders
+
+| Folder            | Responsibility                                                        |
+| ----------------- | --------------------------------------------------------------------- |
+| `src/entries/`    | One entry per HTML page: runs the access guard, then mounts React      |
+| `src/pages/`      | One component per page, holding that page's state and API calls        |
+| `src/components/` | Shared components — `ui/` holds the primitives (Button, Modal, Field…) |
+| `src/lib/`        | `api.js` (HTTP client), `session.js` (localStorage), `auth.js` (login / signup / guards), `format.js`, `constants.js` |
+
+## Authentication
+
+The JWT is stored in `localStorage` and attached automatically to every request
+by `src/lib/api.js` — it is never displayed or pasted by hand. Protected pages
+run their guard **before** React mounts, so a logged-out visitor is redirected
+to `/login.html?next=…` without ever seeing the page. When the API answers
+`401` on a request that carried a token, the session is cleared and the user is
+sent back to the login page.
+
+## API calls
+
+All calls use a relative path (`/api/...`), so the same build works in both
+setups: in production the Go server serves the pages and the API from the same
+origin, and in development the Vite dev server proxies `/api` to
+`http://localhost:3000` (see `vite.config.js`). **There is no API base URL to
+configure anywhere in the interface.**
 
 ---
 
@@ -311,8 +343,9 @@ architecture.
 * Permissions system
 * Projects system
 * React frontend migration
-* Frontend modular architecture
+* Multi-page frontend architecture (Tailwind CSS)
 * Dockerized MySQL migration
+* Full Docker setup (backend + frontend)
 * README/documentation
 
 ## Naman Kumar
@@ -333,14 +366,11 @@ Part 2: [https://youtu.be/cLzsbtYu3Bc](https://youtu.be/cLzsbtYu3Bc)
 
 # Future Improvements
 
-* Full React state management
-* Better UI/UX
 * Real-time updates
 * Notifications
 * CI/CD pipeline
 * Unit tests
 * PostgreSQL support
-* Frontend routing
 * Dark mode
 
 

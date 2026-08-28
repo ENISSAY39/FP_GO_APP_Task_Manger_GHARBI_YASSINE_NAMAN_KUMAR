@@ -115,7 +115,7 @@ func GetProjectDetail(c *gin.Context) {
 
 	db := initializers.DB
 	var project models.Project
-	if err := db.Preload("Members").Preload("Tasks.Assignees").First(&project, projectID).Error; err != nil {
+	if err := db.Preload("Members.User").Preload("Tasks.Assignees.User").First(&project, projectID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "project not found"})
 		return
 	}

@@ -153,9 +153,11 @@ project-root/
 ## 1. Clone Repository
 
 ```bash
-git clone <repository_url>
-cd <repository_name>
+git clone https://github.com/ENISSAY39/FP_GO_APP_Task_Manger_GHARBI_YASSINE_NAMAN_KUMAR.git
+cd FP_GO_APP_Task_Manger_GHARBI_YASSINE_NAMAN_KUMAR
 ```
+
+Contributions are welcome — issues and pull requests are open.
 
 ---
 

@@ -158,9 +158,8 @@ cd <repository_name>
 
 # Environment Variables
 
-The project ships a `.env.exempl` template (safe to commit — placeholder
-values only, no real secrets). Copy it to `.env` and fill in your real
-values:
+The project ships a `.env.exempl` template (safe to commit — placeholder values
+only, no real secrets). Copy it to `.env` and fill in your real values:
 
 ```bash
 cp .env.exempl .env
@@ -176,9 +175,9 @@ DB_NAME=db_name_change_this
 JWT_SECRET=development_secret_key_change_this
 ```
 
-`.env` is gitignored and must never be committed — it's used both when
-running the backend directly (`go run main.go`) and by the Dockerized `app`
-service below.
+`.env` is gitignored and must never be committed — it's used both when running
+the backend directly (`go run main.go`) and by the Dockerized `app` service
+below.
 
 > When running via Docker Compose, `DB_HOST` is automatically overridden to
 > `mysql` (the service name) for the `app` container, so you don't need a
@@ -188,10 +187,9 @@ service below.
 
 # 🚀 Run everything with Docker (recommended)
 
-`docker-compose.yml` starts the **whole stack** in one command: MySQL, the
-Go backend, and the React frontend (built and served by the backend). No
-more starting the database, the backend and the frontend by hand in three
-terminals.
+`docker-compose.yml` starts the **whole stack** in one command: MySQL, the Go
+backend, and the React frontend (built and served by the backend). No more
+starting the database, the backend and the frontend by hand in three terminals.
 
 ```bash
 docker compose up --build -d
@@ -220,17 +218,17 @@ docker compose down        # stop everything (the DB volume is kept)
 
 > The `app` image is built from the multi-stage `Dockerfile` at the project
 > root: stage 1 builds the frontend (`frontend/dist`), stage 2 builds the Go
-> binary, and the final image just runs that binary, which serves the API
-> under `/api` and the built frontend for everything else (see `main.go`).
-> Your local `.env` file is mounted into the container read-only — it is
-> never copied into the image.
+> binary, and the final image just runs that binary, which serves the API under
+> `/api` and the built frontend for everything else (see `main.go`). Your local
+> `.env` file is mounted into the container read-only — it is never copied into
+> the image.
 
 ---
 
 # Manual setup (without Docker)
 
-Useful during active development, for hot reload on the frontend and
-`go run` on the backend.
+Useful during active development, for hot reload on the frontend and `go run` on
+the backend.
 
 ## 1. Start MySQL only
 
@@ -288,7 +286,8 @@ No manual SQL setup required.
 
 # Frontend Architecture
 
-The frontend was migrated from a single large JavaScript file to a modular React architecture.
+The frontend was migrated from a single large JavaScript file to a modular React
+architecture.
 
 ## Main Modules
 
@@ -326,11 +325,9 @@ The frontend was migrated from a single large JavaScript file to a modular React
 
 # Demo Videos (without React front-end)
 
-Part 1:
-[https://youtu.be/P7U-sndT01s](https://youtu.be/P7U-sndT01s)
+Part 1: [https://youtu.be/P7U-sndT01s](https://youtu.be/P7U-sndT01s)
 
-Part 2:
-[https://youtu.be/cLzsbtYu3Bc](https://youtu.be/cLzsbtYu3Bc)
+Part 2: [https://youtu.be/cLzsbtYu3Bc](https://youtu.be/cLzsbtYu3Bc)
 
 ---
 

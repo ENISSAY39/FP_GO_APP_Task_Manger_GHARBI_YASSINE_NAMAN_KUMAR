@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Button from './ui/Button.jsx'
 import Logo from './Logo.jsx'
+import RemindersMenu from './RemindersMenu.jsx'
 import { logout } from '../lib/auth.js'
 import { getCurrentUser } from '../lib/session.js'
 import { initialsOf } from '../lib/format.js'
@@ -37,6 +38,8 @@ export default function Navbar({ current }) {
         </nav>
 
         <div className="ml-auto flex items-center gap-3">
+          <RemindersMenu />
+
           {user && (
             <div className="flex items-center gap-2.5">
               <span

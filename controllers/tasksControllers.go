@@ -2,8 +2,10 @@ package controllers
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -12,6 +14,23 @@ import (
 	"github.com/ENISSAY39/FP_GO_APP_Task_Manger_GHARBI_YASSINE_NAMAN_KUMAR/initializers"
 	"github.com/ENISSAY39/FP_GO_APP_Task_Manger_GHARBI_YASSINE_NAMAN_KUMAR/models"
 )
+
+//
+// --------------------------- VOCABULAIRE ---------------------------
+//
+
+// invalidStatusMessage : message d'erreur nommant le champ refusé et les
+// valeurs acceptées, pour que le client sache quoi corriger.
+func invalidStatusMessage(status string) string {
+	return fmt.Sprintf("invalid status %q: must be one of %s",
+		status, strings.Join(models.AllowedTaskStatuses, ", "))
+}
+
+// invalidPriorityMessage : idem pour la priorité.
+func invalidPriorityMessage(priority string) string {
+	return fmt.Sprintf("invalid priority %q: must be one of %s",
+		priority, strings.Join(models.AllowedTaskPriorities, ", "))
+}
 
 //
 // --------------------------- CREATE TASK ---------------------------
@@ -54,6 +73,13 @@ func CreateTask(c *gin.Context) {
 	var body createTaskPayload
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Une priorité absente prend la valeur par défaut ; une priorité fournie
+	// doit appartenir au vocabulaire (voir CONTEXT.md).
+	if body.Priority != "" && !models.IsValidTaskPriority(body.Priority) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": invalidPriorityMessage(body.Priority)})
 		return
 	}
 
@@ -178,6 +204,17 @@ func UpdateTask(c *gin.Context) {
 	var body updateTaskPayload
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validation du vocabulaire avant toute écriture : un statut ou une priorité
+	// hors liste est refusé, jamais stocké (voir CONTEXT.md).
+	if body.Status != nil && !models.IsValidTaskStatus(*body.Status) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": invalidStatusMessage(*body.Status)})
+		return
+	}
+	if body.Priority != nil && !models.IsValidTaskPriority(*body.Priority) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": invalidPriorityMessage(*body.Priority)})
 		return
 	}
 

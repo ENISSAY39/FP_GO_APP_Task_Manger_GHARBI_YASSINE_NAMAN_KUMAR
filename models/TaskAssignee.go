@@ -7,9 +7,9 @@ import (
 )
 
 type TaskAssignee struct {
-	ID        uint           `gorm:"primaryKey" json:"id"`
-	TaskID    uint           `gorm:"index;not null" json:"task_id"`
-	UserID    uint           `gorm:"index;not null" json:"user_id"`
+	ID     uint `gorm:"primaryKey" json:"id"`
+	TaskID uint `gorm:"index;not null" json:"task_id"`
+	UserID uint `gorm:"index;not null" json:"user_id"`
 
 	User User `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"user"`
 

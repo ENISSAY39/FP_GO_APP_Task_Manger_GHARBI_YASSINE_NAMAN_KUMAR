@@ -2,10 +2,10 @@ package controllers
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"os"
 	"time"
-	"log"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
@@ -122,9 +122,9 @@ func Login(c *gin.Context) {
 
 // Logout invalidates the JWT token (handled on client-side)
 func Logout(c *gin.Context) {
-    // Optionnel : logger qui s'est déconnecté
-    userID, _ := c.Get("userID")
-    log.Printf("User %v logged out", userID)
-    
-    c.JSON(http.StatusOK, gin.H{"message": "logged out"})
+	// Optionnel : logger qui s'est déconnecté
+	userID, _ := c.Get("userID")
+	log.Printf("User %v logged out", userID)
+
+	c.JSON(http.StatusOK, gin.H{"message": "logged out"})
 }

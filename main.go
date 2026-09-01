@@ -109,26 +109,24 @@ func main() {
 			c.JSON(http.StatusOK, gin.H{"ok": true, "userID": v})
 		})
 
-			// Logout
+		// Logout
 		api.POST("/logout", middleware.RequireAuth(), controllers.Logout)
 
 		// Projects
-		api.POST("/projects", middleware.RequireAuth(), controllers.CreateProject) //marche 
-		api.GET("/projects", middleware.RequireAuth(), controllers.GetMyProjects) //marche
+		api.POST("/projects", middleware.RequireAuth(), controllers.CreateProject)              //marche
+		api.GET("/projects", middleware.RequireAuth(), controllers.GetMyProjects)               //marche
 		api.GET("/projects/:projectId", middleware.RequireAuth(), controllers.GetProjectDetail) //marche
-		api.DELETE("/projects/:projectId", middleware.RequireAuth(), controllers.DeleteProject) 
+		api.DELETE("/projects/:projectId", middleware.RequireAuth(), controllers.DeleteProject)
 
 		// Members
-		api.POST("/projects/:projectId/members", middleware.RequireAuth(), controllers.AddMember) //marche
+		api.POST("/projects/:projectId/members", middleware.RequireAuth(), controllers.AddMember)                     //marche
 		api.DELETE("/projects/:projectId/members/:userId", middleware.RequireAuth(), controllers.RemoveMemberByParam) //marche
-		
 
 		// Tasks
-		api.POST("/projects/:projectId/tasks", middleware.RequireAuth(), controllers.CreateTask) //marche
+		api.POST("/projects/:projectId/tasks", middleware.RequireAuth(), controllers.CreateTask)     //marche
 		api.GET("/projects/:projectId/tasks", middleware.RequireAuth(), controllers.GetProjectTasks) //marche
-		api.PUT("/tasks/:taskId", middleware.RequireAuth(), controllers.UpdateTask) //marche 
-		api.DELETE("/tasks/:taskId", middleware.RequireAuth(), controllers.DeleteTask) //marche 
-
+		api.PUT("/tasks/:taskId", middleware.RequireAuth(), controllers.UpdateTask)                  //marche
+		api.DELETE("/tasks/:taskId", middleware.RequireAuth(), controllers.DeleteTask)               //marche
 
 		// keeping existing PUT route
 		api.PUT("/tasks/:taskId/assign", middleware.RequireAuth(), controllers.AssignTask)

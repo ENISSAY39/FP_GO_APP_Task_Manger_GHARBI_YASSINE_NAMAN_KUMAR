@@ -12,9 +12,9 @@ const (
 )
 
 type Project struct {
-	ID          uint           `gorm:"primaryKey" json:"id"`
-	Name        string         `gorm:"size:150;not null" json:"name"`
-	Description string         `gorm:"type:text" json:"description"`
+	ID          uint   `gorm:"primaryKey" json:"id"`
+	Name        string `gorm:"size:150;not null" json:"name"`
+	Description string `gorm:"type:text" json:"description"`
 
 	OwnerID *uint `gorm:"index" json:"owner_id"`
 	Owner   User  `gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"owner"`

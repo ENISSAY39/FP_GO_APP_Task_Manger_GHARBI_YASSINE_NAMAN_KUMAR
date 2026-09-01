@@ -1,0 +1,23 @@
+# Line endings.
+#
+# Part of this repo was committed from Windows with CRLF in the blobs and part
+# with LF, which made `gofmt -l` list nearly every Go file: gofmt reads the
+# working copy, and a CRLF file is never gofmt-clean. Normalising to LF in the
+# index *and* in the working copy settles it for every tool that reads files
+# rather than blobs.
+#
+# Contributors on Windows keep working normally: editors and the Go toolchain
+# all handle LF, and `core.autocrlf` no longer decides anything here.
+* text=auto eol=lf
+
+# Binaries must never be touched by the above.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
+*.exe binary

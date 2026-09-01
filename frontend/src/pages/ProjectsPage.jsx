@@ -129,6 +129,7 @@ export default function ProjectsPage() {
                 key={project.id}
                 project={project}
                 isOwner={project.owner_id === currentUser?.id}
+                currentUserId={currentUser?.id}
                 onDelete={setPendingDelete}
               />
             ))}

@@ -1,12 +1,16 @@
 import Badge from './ui/Badge.jsx'
 import Button, { LinkButton } from './ui/Button.jsx'
 import { formatDate } from '../lib/format.js'
+import { isAssignedTo, reminderStateOf } from '../lib/reminders.js'
 
-export default function ProjectCard({ project, isOwner, onDelete }) {
+export default function ProjectCard({ project, isOwner, currentUserId, onDelete }) {
   const memberCount = project.members?.length ?? 0
   const taskCount = project.tasks?.length ?? 0
   const doneCount = project.tasks?.filter((task) => task.status === 'DONE').length ?? 0
   const progress = taskCount > 0 ? Math.round((doneCount / taskCount) * 100) : 0
+  const reminderCount = (project.tasks ?? []).filter(
+    (task) => isAssignedTo(task, currentUserId) && reminderStateOf(task),
+  ).length
 
   return (
     <article className="group flex flex-col rounded-xl border border-white/8 bg-surface-900/80 p-5 transition-colors hover:border-white/15">
@@ -14,7 +18,14 @@ export default function ProjectCard({ project, isOwner, onDelete }) {
         <h3 className="line-clamp-2 min-w-0 flex-1 text-base font-semibold text-balance text-slate-100">
           {project.name}
         </h3>
-        {isOwner && <Badge tone="violet">Owner</Badge>}
+        <div className="flex shrink-0 items-center gap-1.5">
+          {reminderCount > 0 && (
+            <Badge tone="rose">
+              {reminderCount} due
+            </Badge>
+          )}
+          {isOwner && <Badge tone="violet">Owner</Badge>}
+        </div>
       </div>
 
       <p className="mt-2 line-clamp-2 min-h-[2.5rem] text-sm text-slate-400">

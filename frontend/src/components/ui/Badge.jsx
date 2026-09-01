@@ -1,4 +1,5 @@
 import { PRIORITY_LABELS, STATUS_LABELS } from '../../lib/constants.js'
+import { REMINDER_LABELS } from '../../lib/reminders.js'
 
 const TONES = {
   neutral: 'border-white/10 bg-white/5 text-slate-300',
@@ -40,4 +41,12 @@ export function PriorityBadge({ priority }) {
 
 export function RoleBadge({ role }) {
   return <Badge tone={role === 'OWNER' ? 'violet' : 'neutral'}>{role}</Badge>
+}
+
+const REMINDER_TONES = { overdue: 'rose', due_soon: 'amber' }
+
+/** `state` is the result of `reminderStateOf()` — renders nothing when null. */
+export function ReminderBadge({ state }) {
+  if (!state) return null
+  return <Badge tone={REMINDER_TONES[state]}>{REMINDER_LABELS[state]}</Badge>
 }

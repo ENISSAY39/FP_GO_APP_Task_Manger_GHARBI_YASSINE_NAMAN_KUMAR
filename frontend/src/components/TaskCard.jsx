@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import Button from './ui/Button.jsx'
-import { PriorityBadge, StatusBadge } from './ui/Badge.jsx'
+import { PriorityBadge, ReminderBadge, StatusBadge } from './ui/Badge.jsx'
 import { TASK_STATUSES, STATUS_LABELS } from '../lib/constants.js'
 import { displayUser, formatDate, initialsOf } from '../lib/format.js'
+import { reminderStateOf } from '../lib/reminders.js'
 
 export default function TaskCard({
   task,
@@ -16,6 +17,7 @@ export default function TaskCard({
 }) {
   const [assigning, setAssigning] = useState(false)
 
+  const reminder = reminderStateOf(task)
   const assignees = task.assignees ?? []
   const assignedIds = new Set(assignees.map((assignee) => assignee.user_id))
   const assignable = members.filter((member) => !assignedIds.has(member.user_id))
@@ -45,6 +47,7 @@ export default function TaskCard({
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           <StatusBadge status={task.status} />
           <PriorityBadge priority={task.priority} />
+          <ReminderBadge state={reminder} />
         </div>
       </div>
 
@@ -55,7 +58,17 @@ export default function TaskCard({
         {task.due_date && (
           <>
             <span aria-hidden="true">•</span>
-            <span className="text-slate-400">Due {formatDate(task.due_date)}</span>
+            <span
+              className={
+                reminder === 'overdue'
+                  ? 'font-medium text-rose-400'
+                  : reminder === 'due_soon'
+                    ? 'font-medium text-amber-400'
+                    : 'text-slate-400'
+              }
+            >
+              Due {formatDate(task.due_date)}
+            </span>
           </>
         )}
       </div>

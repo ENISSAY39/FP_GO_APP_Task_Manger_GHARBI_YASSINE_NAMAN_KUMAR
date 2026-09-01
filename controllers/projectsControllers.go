@@ -73,7 +73,7 @@ func GetMyProjects(c *gin.Context) {
 
 	var projects []models.Project
 	if len(projectIDs) > 0 {
-		if err := db.Where("id IN ?", projectIDs).Preload("Members").Preload("Tasks").Find(&projects).Error; err != nil {
+		if err := db.Where("id IN ?", projectIDs).Preload("Members").Preload("Tasks.Assignees.User").Find(&projects).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not load projects"})
 			return
 		}

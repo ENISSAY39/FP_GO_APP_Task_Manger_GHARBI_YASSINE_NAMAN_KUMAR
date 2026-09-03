@@ -31,3 +31,9 @@ migrated to)
 How urgent a Task is, independently of its due date. Exactly three values:
 `LOW`, `MEDIUM`, `HIGH`, defaulting to `MEDIUM`. Same rule as status: a value
 outside the list is rejected, never stored.
+
+## Decisions and open questions
+
+Decisions that shape this vocabulary live in `docs/adr/`. Ambiguities nobody has
+settled yet live in `docs/open-questions.md` — read it before starting a block
+of work, so a question gets answered rather than accidentally decided.

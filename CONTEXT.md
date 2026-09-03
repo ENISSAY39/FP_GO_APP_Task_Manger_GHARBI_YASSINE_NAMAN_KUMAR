@@ -19,6 +19,15 @@ A Task whose `DueDate` is in the past and whose `Status` is not `DONE`.
 A Task whose `DueDate` falls within the next 24 hours and whose `Status` is not
 `DONE`. The 24-hour window is fixed, not user-configurable.
 
+**Orphan**:  
+A Task that carries a Reminder and has no assignee. Nobody owes it, so it
+appears in no personal count; it is surfaced to the Project Owner on the Project
+card instead (ADR 0003). Being an Orphan is about the absence of an assignee,
+not about lateness on its own — a Task with no assignee and no Reminder is
+simply unassigned.  
+_Avoid_: Unassigned (true of any Task without an assignee, including ones that
+need no attention at all)
+
 **Task status**:  
 The stage a Task is in. Exactly three values, spelled identically in the
 database, in the Go constants and in the frontend: `TODO`, `IN_PROGRESS`,

@@ -8,13 +8,18 @@ export default function ProjectCard({ project, isOwner, currentUserId, onDelete 
   const taskCount = project.tasks?.length ?? 0
   const doneCount = project.tasks?.filter((task) => task.status === 'DONE').length ?? 0
   const progress = taskCount > 0 ? Math.round((doneCount / taskCount) * 100) : 0
-  const reminderCount = (project.tasks ?? []).filter(
+  // Each predicate is wrapped rather than passed by reference: filter would
+  // hand it the element index as a second argument, which these rules read as
+  // the clock.
+  const countTasks = (predicate) => (project.tasks ?? []).filter((task) => predicate(task)).length
+
+  const reminderCount = countTasks(
     (task) => isAssignedTo(task, currentUserId) && reminderStateOf(task),
-  ).length
+  )
   // Orphan work is the Owner's to hand out, so only they are shown it
   // (ADR 0003). It is deliberately absent from the personal count above and
   // from the navbar: nobody owes an Orphan, which is the whole problem.
-  const orphanCount = isOwner ? (project.tasks ?? []).filter((task) => isOrphan(task)).length : 0
+  const orphanCount = isOwner ? countTasks(isOrphan) : 0
 
   return (
     <article className="group flex flex-col rounded-xl border border-white/8 bg-surface-900/80 p-5 transition-colors hover:border-white/15">

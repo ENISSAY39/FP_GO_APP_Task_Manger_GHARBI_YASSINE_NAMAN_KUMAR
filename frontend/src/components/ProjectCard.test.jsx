@@ -181,6 +181,23 @@ describe('ProjectCard orphan count', () => {
     expect(screen.getByText('Owner')).toBeInTheDocument()
   })
 
+  it('gives the orphan badge its own colour, so it never reads as work I owe', () => {
+    // The two counts sit side by side and mean different things, so the tone
+    // is load-bearing rather than decorative. Asserting the class is the only
+    // way to see it, which is why this is the one such assertion here.
+    renderCard(
+      [
+        orphan({ id: 1, due_date: dueIn(-2 * DAY) }),
+        task({ id: 2, due_date: dueIn(-3 * DAY) }),
+      ],
+      { isOwner: true },
+    )
+
+    expect(orphanBadge()).toHaveClass('text-amber-300')
+    expect(countBadge()).toHaveClass('text-rose-300')
+    expect(orphanBadge()).not.toHaveClass('text-rose-300')
+  })
+
   it('does not count a DONE task nobody is assigned to', () => {
     renderCard([orphan({ id: 1, status: 'DONE', due_date: dueIn(-2 * DAY) })], { isOwner: true })
 

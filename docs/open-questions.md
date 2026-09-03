@@ -4,7 +4,11 @@ Ambiguities surfaced while specifying and building the due-date Reminder feature
 and the task status vocabulary fix, left open on purpose. Each one is a decision
 nobody has made yet, not a bug.
 
-Written 2026-09-01. Review before the next block of work.
+Written 2026-09-01, last reviewed 2026-09-03. Review before the next block of
+work.
+
+Settled since: unassigned overdue work now reaches the Project Owner on the
+Project card — see ADR 0003, and the **Orphan** entry in `CONTEXT.md`.
 
 Resolved decisions do not live here: they go to `docs/adr/`, and settled
 vocabulary goes to `CONTEXT.md`.
@@ -15,12 +19,6 @@ vocabulary goes to `CONTEXT.md`.
 > that is not below still needs adding by hand.
 
 ## Product
-
-**Unassigned overdue work reaches nobody.**  
-An unassigned Task with a past due date shows its badge on the Task card, but
-appears in no navbar list and in no Project count, because both are
-viewer-scoped. Nobody is told about it. Routing it to the Project Owner is the
-obvious candidate and was deliberately deferred. _Spec #3, Out of Scope._
 
 **The 24-hour window is fixed for everyone.**  
 No setting, no per-user preference. Fine today; the question is whether a

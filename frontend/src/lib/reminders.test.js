@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { collectReminders, isAssignedTo, reminderStateOf } from './reminders.js'
+import { collectReminders, isAssignedTo, isOrphan, reminderStateOf } from './reminders.js'
 
 // Every test freezes the clock: a reminder is a comparison against "now", so a
 // suite that read the real clock would pass or fail depending on the day it ran.
@@ -197,5 +197,53 @@ describe('collectReminders', () => {
     const projects = [{ id: 1, name: 'Alpha', tasks: [mine({ id: 1, due_date: dueIn(-DAY) })] }]
 
     expect(collectReminders(projects, undefined, NOW)).toEqual([])
+  })
+})
+
+describe('isOrphan', () => {
+  // An Orphan is a Task that carries a Reminder *and* has nobody on the hook
+  // for it. Both halves matter: see the CONTEXT.md entry, which marks
+  // "Unassigned" as the term to avoid precisely because it drops the first.
+  it('is true for an overdue task nobody is assigned to', () => {
+    expect(isOrphan(task({ due_date: dueIn(-2 * DAY), assignees: [] }), NOW)).toBe(true)
+  })
+
+  it('is true for a due-soon task nobody is assigned to', () => {
+    expect(isOrphan(task({ due_date: dueIn(2 * HOUR), assignees: [] }), NOW)).toBe(true)
+  })
+
+  it('is false once somebody is assigned, however late the task', () => {
+    expect(
+      isOrphan(task({ due_date: dueIn(-30 * DAY), assignees: [{ user_id: 7 }] }), NOW),
+    ).toBe(false)
+  })
+
+  it('is false for an unassigned task that carries no reminder', () => {
+    expect(isOrphan(task({ due_date: dueIn(30 * DAY), assignees: [] }), NOW)).toBe(false)
+  })
+
+  it('is false for an unassigned task with no due date at all', () => {
+    expect(isOrphan(task({ due_date: null, assignees: [] }), NOW)).toBe(false)
+  })
+
+  it('is false for a DONE task long past its due date', () => {
+    expect(
+      isOrphan(task({ status: 'DONE', due_date: dueIn(-30 * DAY), assignees: [] }), NOW),
+    ).toBe(false)
+  })
+
+  it('treats a missing assignee list as nobody assigned', () => {
+    const { assignees, ...withoutAssignees } = task({ due_date: dueIn(-DAY) })
+    expect(assignees).toBeDefined()
+    expect(isOrphan(withoutAssignees, NOW)).toBe(true)
+  })
+
+  it('is false for a missing task rather than throwing', () => {
+    expect(isOrphan(undefined, NOW)).toBe(false)
+    expect(isOrphan(null, NOW)).toBe(false)
+  })
+
+  it('is false for an unparseable due date', () => {
+    expect(isOrphan(task({ due_date: 'not a date', assignees: [] }), NOW)).toBe(false)
   })
 })

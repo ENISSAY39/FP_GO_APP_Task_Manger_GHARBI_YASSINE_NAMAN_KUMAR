@@ -217,3 +217,29 @@ describe('RemindersMenu when things go wrong', () => {
     expect(api.get).not.toHaveBeenCalled()
   })
 })
+
+describe('RemindersMenu stays personal', () => {
+  // ADR 0003 routes Orphan work to the project Owner on the project card and
+  // deliberately keeps it out of here: the navbar answers "what do I owe?",
+  // and a count mixing that with work nobody owns stops being actionable.
+  it('ignores overdue tasks nobody is assigned to, even for the project owner', async () => {
+    respondWith([
+      {
+        id: 1,
+        name: 'Apollo',
+        owner_id: ME,
+        tasks: [
+          task({ id: 1, title: 'Mine and late', due_date: dueIn(-DAY) }),
+          task({ id: 2, title: 'Nobody owns this', due_date: dueIn(-5 * DAY), assignees: [] }),
+        ],
+      },
+    ])
+
+    render(<RemindersMenu />)
+
+    await waitFor(() => expect(indicator()).toHaveAccessibleName('Reminders, 1 due'))
+    const rows = await openMenu()
+    expect(rows).toHaveLength(1)
+    expect(screen.queryByText('Nobody owns this')).not.toBeInTheDocument()
+  })
+})

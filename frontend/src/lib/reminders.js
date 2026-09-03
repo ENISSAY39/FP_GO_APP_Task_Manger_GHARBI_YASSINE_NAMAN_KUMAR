@@ -32,6 +32,21 @@ export function isAssignedTo(task, userId) {
 }
 
 /**
+ * An Orphan: a task that needs attention and that nobody is on the hook for.
+ *
+ * Both halves are required — an unassigned task that is not yet due is not an
+ * Orphan, and neither is a late task somebody owns. See the CONTEXT.md entry,
+ * which reserves "unassigned" for the weaker, assignee-only sense.
+ *
+ * Surfaced to the project Owner on the project card only; the navbar stays
+ * personal (ADR 0003).
+ */
+export function isOrphan(task, now = new Date()) {
+  if ((task?.assignees ?? []).length > 0) return false
+  return reminderStateOf(task, now) !== null
+}
+
+/**
  * Every task across `projects` that is assigned to `userId` and currently
  * has a reminder, soonest-due first with overdue tasks ahead of due-soon.
  */

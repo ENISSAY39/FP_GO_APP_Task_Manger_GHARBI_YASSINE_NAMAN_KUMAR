@@ -1,7 +1,7 @@
 import Badge from './ui/Badge.jsx'
 import Button, { LinkButton } from './ui/Button.jsx'
 import { formatDate } from '../lib/format.js'
-import { isAssignedTo, reminderStateOf } from '../lib/reminders.js'
+import { isAssignedTo, isOrphan, reminderStateOf } from '../lib/reminders.js'
 
 export default function ProjectCard({ project, isOwner, currentUserId, onDelete }) {
   const memberCount = project.members?.length ?? 0
@@ -11,6 +11,10 @@ export default function ProjectCard({ project, isOwner, currentUserId, onDelete 
   const reminderCount = (project.tasks ?? []).filter(
     (task) => isAssignedTo(task, currentUserId) && reminderStateOf(task),
   ).length
+  // Orphan work is the Owner's to hand out, so only they are shown it
+  // (ADR 0003). It is deliberately absent from the personal count above and
+  // from the navbar: nobody owes an Orphan, which is the whole problem.
+  const orphanCount = isOwner ? (project.tasks ?? []).filter((task) => isOrphan(task)).length : 0
 
   return (
     <article className="group flex flex-col rounded-xl border border-white/8 bg-surface-900/80 p-5 transition-colors hover:border-white/15">
@@ -23,6 +27,9 @@ export default function ProjectCard({ project, isOwner, currentUserId, onDelete 
             <Badge tone="rose">
               {reminderCount} due
             </Badge>
+          )}
+          {orphanCount > 0 && (
+            <Badge tone="amber">{orphanCount} orphaned</Badge>
           )}
           {isOwner && <Badge tone="violet">Owner</Badge>}
         </div>

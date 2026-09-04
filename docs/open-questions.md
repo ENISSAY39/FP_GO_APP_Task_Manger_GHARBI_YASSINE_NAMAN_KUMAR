@@ -4,7 +4,7 @@ Ambiguities surfaced while specifying and building the due-date Reminder feature
 and the task status vocabulary fix, left open on purpose. Each one is a decision
 nobody has made yet, not a bug.
 
-Written 2026-09-01, last reviewed 2026-09-03. Review before the next block of
+Written 2026-09-01, last reviewed 2026-09-04. Review before the next block of
 work.
 
 Settled since: unassigned overdue work now reaches the Project Owner on the
@@ -13,10 +13,50 @@ Project card — see ADR 0003, and the **Orphan** entry in `CONTEXT.md`.
 Resolved decisions do not live here: they go to `docs/adr/`, and settled
 vocabulary goes to `CONTEXT.md`.
 
-> **Gap to fill.** The grilling interview that preceded the spec surfaced its
-> own ambiguities, and that session is not recoverable from the repo — only its
-> output (`docs/agents/*.md`, commit `c5457bc`) survives. Anything it raised
-> that is not below still needs adding by hand.
+The design interview that preceded the spec is recorded below, under **From the
+design interview**. That session is not recoverable from the repo — only its
+output survives — so those entries were reconstructed from the transcript on
+2026-09-04.
+
+## From the design interview
+
+Nine questions were put and answered before any code was written. Six of the
+answers closed a door that nobody has since reopened; each is a deliberate
+omission, not an oversight.
+
+**Email delivery was deferred, not rejected.**  
+The interview settled on in-app only because the repo has no mail
+infrastructure: no SMTP library in `go.mod`, no mail variables in `.env.exempl`.
+The reasoning was that email is a later layer over the same derived data rather
+than a different feature. Whether it is actually wanted was never decided.
+
+**The Reminder concept was kept deliberately narrow.**  
+A generic `Notification` model — an event catalogue plus per-type delivery
+preferences — was weighed and declined as speculative. The open question is what
+happens when a second notification type arrives: whether Reminder becomes a
+special case of something larger, or keeps its own path.
+
+**A Reminder cannot be dismissed.**  
+This falls straight out of computing on read (ADR 0002): there is no record to
+mark as seen, so a Reminder stays until the Task is Done or its due date moves.
+It was named during the interview as a real limitation, accepted on purpose.
+
+**There is no dedicated "My Reminders" page.**  
+Three tiers of UI placement were weighed and the third — an aggregating page
+with its own Vite entry point — was cut, on the grounds that the navbar dropdown
+answers the same need for less. Whether the dropdown still suffices as a user's
+Task count grows has not been tested.
+
+**Nothing refreshes while a page stays open.**  
+Polling was declined because the README treats real-time updates as a separate
+future item. A Reminder whose state changes while a tab sits open is corrected
+only on the next load or navigation.
+
+**The Owner overview was scoped out, then partly reopened.**  
+The interview scoped Reminders to assignees only and named a project-wide Owner
+view as a v2. ADR 0003 has since granted the Owner one slice of it — unassigned
+overdue work, surfaced as Orphan on the project card — but not the general case
+of seeing every assignee's late work. The rest is still open.
 
 ## Product
 

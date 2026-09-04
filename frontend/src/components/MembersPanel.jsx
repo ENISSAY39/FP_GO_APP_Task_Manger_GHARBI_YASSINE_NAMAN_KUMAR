@@ -7,24 +7,24 @@ import { MEMBER_ROLES } from '../lib/constants.js'
 import { displayUser, initialsOf } from '../lib/format.js'
 
 export default function MembersPanel({ members, isOwner, currentUserId, onAdd, onRemove }) {
-  const [userId, setUserId] = useState('')
+  const [email, setEmail] = useState('')
   const [role, setRole] = useState('MEMBER')
   const [adding, setAdding] = useState(false)
   const [error, setError] = useState('')
 
   const handleAdd = async (event) => {
     event.preventDefault()
-    const parsed = Number(userId)
-    if (!Number.isInteger(parsed) || parsed <= 0) {
-      setError('Enter a numeric user id.')
+    const trimmed = email.trim()
+    if (!trimmed) {
+      setError('Enter the email of the member to add.')
       return
     }
 
     setAdding(true)
     setError('')
     try {
-      await onAdd(parsed, role)
-      setUserId('')
+      await onAdd(trimmed, role)
+      setEmail('')
       setRole('MEMBER')
     } catch (addError) {
       setError(addError.message)
@@ -90,14 +90,14 @@ export default function MembersPanel({ members, isOwner, currentUserId, onAdd, o
           </p>
 
           <div className="flex flex-wrap items-start gap-2">
-            <div className="min-w-[9rem] flex-1">
+            <div className="min-w-[12rem] flex-1">
               <Field
-                placeholder="User id"
-                inputMode="numeric"
-                value={userId}
-                onChange={(event) => setUserId(event.target.value)}
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
                 error={error}
-                hint={error ? undefined : 'The API identifies users by their numeric id.'}
+                hint={error ? undefined : 'The person must already have an account.'}
               />
             </div>
 

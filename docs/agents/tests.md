@@ -8,14 +8,23 @@ pourtant `go test ./...` trouve les tests.
 
 ## 1. Ce qui a réellement été ajouté
 
-Trois fichiers, plus un script de confort :
+Quatre fichiers de test, plus un script de confort :
 
 | Fichier | Rôle |
 |---|---|
 | `models/TaskModel_test.go` | fige le vocabulaire des tâches (statuts, priorités) |
 | `controllers/tasksControllers_test.go` | fige les messages de refus renvoyés au client |
+| `controllers/projectsControllers_test.go` | fige la résolution d'un membre à ajouter (email ou id) |
+| `cmd/seed/plan_test.go` | fige la couverture du jeu de données semé et le garde-fou d'hôte |
 | `frontend/go.mod` | fait ignorer `frontend/` par la boîte à outils Go |
 | `test.sh` | lance les deux moitiés de la suite en une commande |
+
+Le même principe partout : ce qui parle à la base n'est pas testé, ce qui se
+décide sans elle l'est. Pour le semis, cela veut dire que les insertions sont
+laissées de côté, mais que le plan — la liste des comptes, des projets et des
+tâches — est vérifié comme une valeur ordinaire. C'est lui qui porte la
+couverture du vocabulaire de `CONTEXT.md`, et c'est donc lui qui doit alerter
+quand une retouche fait disparaître le dernier Orphan du jeu de données.
 
 Aucune dépendance n'a été ajoutée à `go.mod`. Aucun fichier de configuration de
 test n'existe côté Go. C'est normal, et c'est le point suivant.

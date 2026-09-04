@@ -278,6 +278,39 @@ http://localhost:5173
 The dev server proxies `/api` to the Go backend on port 3000, so log in and
 everything else works exactly as it does in the Docker setup.
 
+## 4. Seed test data (optional)
+
+A fresh database has no accounts, so every test starts with a signup form. The
+seed fills it instead:
+
+```bash
+go run ./cmd/seed
+```
+
+It creates five accounts on `@example.test`, three projects and twelve tasks,
+then prints the login table. Every seeded account shares the password
+`secret123`.
+
+The dataset is built so that each term in `CONTEXT.md` has a visible instance:
+all three statuses and priorities, an Overdue task, a Due soon one, an Orphan (a
+task carrying a Reminder that nobody is assigned to), a task with two assignees,
+a task that is `DONE` past its due date — which must *not* read as Overdue — and
+a project with no tasks at all, for the empty state. Due dates are offsets from
+the moment you run it, so the dataset never decays into "everything is overdue".
+
+Re-running resets: seeded rows are deleted and rebuilt. Only `@example.test`
+accounts and the projects they own are ever touched — your own account and
+projects are never in range.
+
+```bash
+go run ./cmd/seed -join you@example.com   # also add an existing account as MEMBER
+go run ./cmd/seed -force                  # seed a DB_HOST that is not local
+```
+
+The seed refuses to run against a non-local `DB_HOST` unless `-force` is passed:
+it deletes rows for real, and should be hard to point anywhere but a development
+machine.
+
 ---
 
 # Database Migration
@@ -322,9 +355,9 @@ navigation. There is no client-side router.
 The JWT is stored in `localStorage` and attached automatically to every request
 by `src/lib/api.js` — it is never displayed or pasted by hand. Protected pages
 run their guard **before** React mounts, so a logged-out visitor is redirected
-to `/login.html?next=…` without ever seeing the page. When the API answers
-`401` on a request that carried a token, the session is cleared and the user is
-sent back to the login page.
+to `/login.html?next=…` without ever seeing the page. When the API answers `401`
+on a request that carried a token, the session is cleared and the user is sent
+back to the login page.
 
 ## API calls
 

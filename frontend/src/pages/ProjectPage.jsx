@@ -146,11 +146,8 @@ export default function ProjectPage() {
   const handleUnassign = (task, userId) =>
     run(() => api.put(`/tasks/${task.id}/unassign`, { user_id: userId }), 'Member unassigned.')
 
-  const handleAddMember = (userId, role) =>
-    submit(
-      () => api.post(`/projects/${PROJECT_ID}/members`, { user_id: userId, role }),
-      'Member added.',
-    )
+  const handleAddMember = (email, role) =>
+    submit(() => api.post(`/projects/${PROJECT_ID}/members`, { email, role }), 'Member added.')
 
   const handleRemoveMember = async () => {
     const ok = await run(

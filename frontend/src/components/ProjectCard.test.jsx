@@ -44,6 +44,9 @@ const renderCard = (tasks, props = {}) =>
 /** The "<n> due" badge, or null when the card shows no count at all. */
 const countBadge = () => screen.queryByText(/^\d+ due$/)
 
+/** The "<n> orphaned" badge, or null when the card shows none. */
+const orphanBadge = () => screen.queryByText(/^\d+ orphaned$/)
+
 beforeEach(() => {
   vi.useFakeTimers()
   vi.setSystemTime(NOW)
@@ -111,5 +114,93 @@ describe('ProjectCard count alongside the Owner badge', () => {
 
     expect(countBadge()).toBeNull()
     expect(screen.getByText('Owner')).toBeInTheDocument()
+  })
+})
+
+describe('ProjectCard orphan count', () => {
+  // Orphan work is surfaced to the Owner here and nowhere else (ADR 0003):
+  // they are the person who can assign it, and the board is one click away.
+  const orphan = (overrides) => task({ assignees: [], ...overrides })
+
+  it('shows the Owner how much late work nobody is on the hook for', () => {
+    renderCard(
+      [
+        orphan({ id: 1, due_date: dueIn(-2 * DAY) }),
+        orphan({ id: 2, due_date: dueIn(2 * HOUR) }),
+        // Unassigned but not yet due: unassigned is not the same as Orphan.
+        orphan({ id: 3, due_date: dueIn(30 * DAY) }),
+      ],
+      { isOwner: true },
+    )
+
+    expect(orphanBadge()).toHaveTextContent('2 orphaned')
+  })
+
+  it('renders no orphan badge when every late task has somebody on it', () => {
+    renderCard([task({ id: 1, due_date: dueIn(-2 * DAY) })], { isOwner: true })
+
+    expect(orphanBadge()).toBeNull()
+  })
+
+  it('renders no orphan badge for a project with no tasks', () => {
+    renderCard([], { isOwner: true })
+
+    expect(orphanBadge()).toBeNull()
+  })
+
+  it('hides the orphan badge from a member who is not the Owner', () => {
+    renderCard([orphan({ id: 1, due_date: dueIn(-2 * DAY) })], { isOwner: false })
+
+    expect(orphanBadge()).toBeNull()
+  })
+
+  it('leaves the personal count untouched: an orphan is nobody’s, including mine', () => {
+    renderCard(
+      [
+        orphan({ id: 1, due_date: dueIn(-2 * DAY) }),
+        task({ id: 2, due_date: dueIn(-3 * DAY) }),
+      ],
+      { isOwner: true },
+    )
+
+    expect(countBadge()).toHaveTextContent('1 due')
+    expect(orphanBadge()).toHaveTextContent('1 orphaned')
+  })
+
+  it('shows the personal count, the orphan count and the Owner badge together', () => {
+    renderCard(
+      [
+        orphan({ id: 1, due_date: dueIn(-2 * DAY) }),
+        task({ id: 2, due_date: dueIn(-3 * DAY) }),
+      ],
+      { isOwner: true },
+    )
+
+    expect(countBadge()).toBeInTheDocument()
+    expect(orphanBadge()).toBeInTheDocument()
+    expect(screen.getByText('Owner')).toBeInTheDocument()
+  })
+
+  it('gives the orphan badge its own colour, so it never reads as work I owe', () => {
+    // The two counts sit side by side and mean different things, so the tone
+    // is load-bearing rather than decorative. Asserting the class is the only
+    // way to see it, which is why this is the one such assertion here.
+    renderCard(
+      [
+        orphan({ id: 1, due_date: dueIn(-2 * DAY) }),
+        task({ id: 2, due_date: dueIn(-3 * DAY) }),
+      ],
+      { isOwner: true },
+    )
+
+    expect(orphanBadge()).toHaveClass('text-amber-300')
+    expect(countBadge()).toHaveClass('text-rose-300')
+    expect(orphanBadge()).not.toHaveClass('text-rose-300')
+  })
+
+  it('does not count a DONE task nobody is assigned to', () => {
+    renderCard([orphan({ id: 1, status: 'DONE', due_date: dueIn(-2 * DAY) })], { isOwner: true })
+
+    expect(orphanBadge()).toBeNull()
   })
 })

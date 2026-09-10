@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -124,8 +125,33 @@ func GetProjectDetail(c *gin.Context) {
 
 // AddMember: only OWNER can add
 type addMemberPayload struct {
-	UserID uint   `json:"user_id" binding:"required"`
+	// An owner names the invitee by email, the identity people know about each
+	// other. UserID stays accepted for callers that already hold an id.
+	Email  string `json:"email"`
+	UserID uint   `json:"user_id"`
 	Role   string `json:"role"` // optional: OWNER or MEMBER
+}
+
+// resolve turns the payload into the id of the account to add. The error is the
+// message shown to the client, paired with the status to answer with.
+func (p addMemberPayload) resolve() (uint, string, int) {
+	email := strings.ToLower(strings.TrimSpace(p.Email))
+	if email == "" {
+		if p.UserID == 0 {
+			return 0, "provide the email of the member to add", http.StatusBadRequest
+		}
+		return p.UserID, "", 0
+	}
+
+	var user models.User
+	err := initializers.DB.Where("email = ?", email).First(&user).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, "no account is registered with that email", http.StatusNotFound
+	}
+	if err != nil {
+		return 0, "db error", http.StatusInternalServerError
+	}
+	return user.ID, "", 0
 }
 
 func AddMember(c *gin.Context) {
@@ -157,12 +183,18 @@ func AddMember(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	targetID, msg, status := body.resolve()
+	if msg != "" {
+		c.JSON(status, gin.H{"error": msg})
+		return
+	}
+
 	role := body.Role
 	if role != models.RoleOwner {
 		role = models.RoleMember
 	}
 
-	if err := AddProjectMember(projectID, body.UserID, role); err != nil {
+	if err := AddProjectMember(projectID, targetID, role); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not add member"})
 		return
 	}

@@ -1,0 +1,42 @@
+name: Docs
+
+# The repo's own Markdown is wrapped at 80 columns: it renders as CommonMark,
+# where single newlines are soft, and the source is read in diffs. Prose left on
+# one enormous logical line makes every edit rewrite the whole paragraph.
+#
+# Nothing enforced this before — the rule lived in the agent instructions, which
+# are not tracked, so a second contributor inherited none of it.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  wrap:
+    name: Markdown prose wrapped at 80
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: wrap-markdown --check
+        run: |
+          # Skills under .agents/ are vendored from upstream: they are not ours
+          # to reformat, and re-filling them would only churn the diff.
+          mapfile -t files < <(git ls-files '*.md' ':!:.agents/**')
+          echo "Checking ${#files[@]} Markdown files."
+
+          if ! node scripts/wrap-markdown.mjs --check "${files[@]}"; then
+            echo
+            echo "The files above are not wrapped at 80 columns. To fix:"
+            echo
+            echo "    node scripts/wrap-markdown.mjs --width 80 <file>"
+            echo
+            echo "To preview without rewriting, use --stdout."
+            exit 1
+          fi

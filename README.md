@@ -391,11 +391,27 @@ configure anywhere in the interface.**
 
 ---
 
-# Demo Videos (without React front-end)
+# Demo Videos
+
+> **These recordings are out of date.** They were made on 6 December 2025,
+> against the original vanilla-JS frontend. The React + Vite frontend replaced
+> it on 11 May 2026, and nothing added since appears in them — due-date
+> Reminders, Orphan work on the project card, adding members by email, or the
+> seed command. What they still show accurately is the core flow the app is
+> built on: registering, signing in, creating a project, adding tasks and
+> assigning them. They are kept as a record of that, not as current
+> documentation of the interface.
 
 Part 1: [https://youtu.be/P7U-sndT01s](https://youtu.be/P7U-sndT01s)
 
 Part 2: [https://youtu.be/cLzsbtYu3Bc](https://youtu.be/cLzsbtYu3Bc)
+
+For the interface as it stands, [Features](#features) and
+[Frontend Architecture](#frontend-architecture) describe what each screen
+carries. The fastest way to see it in a realistic state is `go run ./cmd/seed`,
+which builds a dataset where every term in `CONTEXT.md` has a visible instance —
+including the contrast cases, such as a task that is `DONE` past its due date
+and must not read as Overdue.
 
 ---
 

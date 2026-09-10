@@ -26,9 +26,15 @@ jobs:
 
       - name: wrap-markdown --check
         run: |
-          # Skills under .agents/ are vendored from upstream: they are not ours
-          # to reformat, and re-filling them would only churn the diff.
-          mapfile -t files < <(git ls-files '*.md' ':!:.agents/**')
+          # Skills under .agents/ and .claude/skills/ are vendored from
+          # upstream: they are not ours to reformat, and re-filling them would
+          # churn the diff and be undone by the next skill update. The one
+          # exception is wrap-prose, which documents this very rule and is
+          # maintained here.
+          mapfile -t files < <(
+            git ls-files '*.md' ':!:.agents/**' ':!:.claude/**'
+            git ls-files '.claude/skills/wrap-prose/*.md'
+          )
           echo "Checking ${#files[@]} Markdown files."
 
           if ! node scripts/wrap-markdown.mjs --check "${files[@]}"; then

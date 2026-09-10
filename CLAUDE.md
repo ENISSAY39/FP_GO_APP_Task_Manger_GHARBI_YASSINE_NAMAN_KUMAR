@@ -24,16 +24,18 @@ script `scripts/wrap-markdown.mjs`. Rien ne replie tout seul : il faut lancer le
 script à la main sur ce qui est écrit.
 
 **Ce qui est vérifié.** La CI (`.github/workflows/docs.yml`) passe
-`wrap-markdown.mjs --check` sur les `.md` suivis hors de `.agents/`, et échoue
-en nommant les fichiers fautifs. Elle ne corrige rien et ne voit que les
-fichiers du dépôt : un corps de commit, d'issue ou de PR lui échappe par
-construction, puisqu'il n'est jamais suivi par git.
+`wrap-markdown.mjs --check` sur les `.md` du dépôt et échoue en nommant les
+fichiers fautifs. Les skills vendorisés — `.agents/` et `.claude/skills/` — en
+sont exclus : ils viennent de l'amont, les reformater ne ferait que polluer le
+diff et serait défait à la mise à jour suivante. Seul `wrap-prose` y échappe,
+puisqu'il documente cette règle et qu'il est maintenu ici. Elle ne corrige rien
+et ne voit que les fichiers du dépôt : un corps de commit, d'issue ou de PR lui
+échappe par construction, puisqu'il n'est jamais suivi par git.
 
 **Ce qui ne l'est pas.** Le repli avant envoi reste une discipline. Un hook
-`PreToolUse` a été tenté puis retiré : il ne s'est jamais déclenché, et il
-vivait sous `.claude/`, donc il n'aurait de toute façon profité à personne
-d'autre. La règle tient parce qu'elle est écrite ici, pas parce qu'un
-automatisme y veille.
+`PreToolUse` a été tenté puis retiré : malgré plusieurs pistes écartées, il ne
+s'est jamais déclenché une seule fois. La règle tient parce qu'elle est écrite
+ici, pas parce qu'un automatisme y veille.
 
 Replier également avant envoi :
 - corps de commit ;

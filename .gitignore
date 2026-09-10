@@ -222,7 +222,6 @@ pnpm-lock.yaml
 package.json
 
 # Agent
-CLAUDE.md
 .claude/
 
 
@@ -236,3 +235,8 @@ CLAUDE.md
 !frontend/src/lib/
 !package.json
 !package-lock.json
+
+
+
+# labs
+/labs

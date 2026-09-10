@@ -224,6 +224,11 @@ package.json
 
 
 
+# Skills : Claude Code ne lit que .claude/skills/, dont les entrées sont des
+# liens vers .agents/skills/. Suivre les deux dupliquait le même contenu, donc
+# seul .claude/ est versionné ; .agents/ reste sur le disque pour les liens.
+.agents/
+
 # envirement variables
 .env
 # --- Node / React frontend: re-include files the rules above wrongly hide ---

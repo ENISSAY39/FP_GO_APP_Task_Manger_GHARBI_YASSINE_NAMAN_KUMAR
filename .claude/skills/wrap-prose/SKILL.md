@@ -62,14 +62,17 @@ for the issue body, wrap it at 80 for the file in the repo.
 ## What is enforced, and what is not
 
 CI runs `wrap-markdown.mjs --check` over the repo's tracked `.md` files, so a
-file that drifts fails the build. That is the only automated net, and it reaches
-only files git tracks.
+file that drifts fails the build. Vendored skills are exempt — `.agents/` and
+`.claude/skills/` come from upstream, and reformatting them would be undone by
+the next update. This file is the exception among them, because it documents the
+rule.
 
+That check is the only automated net, and it reaches only files git tracks.
 Everything sent rather than committed — a commit body, an issue or PR body, a
 chat message — is outside it, because none of those is ever a tracked file. A
-`PreToolUse` hook was tried for exactly that case and removed: it never fired,
-and it lived in an ignored directory, so it protected nobody else anyway. Write
-the prose to a file and transform it yourself.
+`PreToolUse` hook was tried for exactly that case and removed: it never fired
+once, through every configuration attempted. Write the prose to a file and
+transform it yourself.
 
 ## What the tool never touches
 

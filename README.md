@@ -322,9 +322,9 @@ navigation. There is no client-side router.
 The JWT is stored in `localStorage` and attached automatically to every request
 by `src/lib/api.js` — it is never displayed or pasted by hand. Protected pages
 run their guard **before** React mounts, so a logged-out visitor is redirected
-to `/login.html?next=…` without ever seeing the page. When the API answers
-`401` on a request that carried a token, the session is cleared and the user is
-sent back to the login page.
+to `/login.html?next=…` without ever seeing the page. When the API answers `401`
+on a request that carried a token, the session is cleared and the user is sent
+back to the login page.
 
 ## API calls
 

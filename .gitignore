@@ -222,7 +222,13 @@ pnpm-lock.yaml
 package.json
 
 # Agent
-.claude/
+# Le skill wrap-prose est suivi : CLAUDE.md y renvoie. Git ne peut pas
+# ré-inclure un chemin dont un parent est exclu, d'où l'ouverture niveau
+# par niveau plutôt qu'une simple négation.
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/wrap-prose/
 
 
 # envirement variables
